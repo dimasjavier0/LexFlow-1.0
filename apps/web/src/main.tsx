@@ -5,4 +5,8 @@ import { App } from "./app";
 import { AuthProvider } from "./contexts/auth-context";
 import "./styles.css";
 
+if ("serviceWorker" in navigator) {
+	window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
+}
+
 createRoot(document.getElementById("root")!).render(<StrictMode><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></StrictMode>);

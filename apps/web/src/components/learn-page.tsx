@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getCollection, type ApiCollection } from "../lib/api";
+import { getCollection, getProgress, type ApiCollection } from "../lib/api";
 import { updateProgress, type LearningStatus } from "../lib/api";
 import { useAuth } from "../contexts/auth-context";
 
@@ -11,6 +11,7 @@ export function LearnPage() {
   const [isTranslationVisible, setIsTranslationVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [progress, setProgress] = useState<Record<string, string>>({});
   const { session } = useAuth();
 
   useEffect(() => {
@@ -20,6 +21,11 @@ export function LearnPage() {
       setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar la colección.");
     });
   }, [collectionSlug]);
+
+  useEffect(() => {
+    if (!session) return;
+    void getProgress(session).then(setProgress).catch(() => undefined);
+  }, [session]);
 
   if (errorMessage) return <main className="auth-page"><p className="text-red-700">{errorMessage}</p></main>;
   if (!collection) return <main className="auth-page">Cargando colección...</main>;
@@ -38,6 +44,7 @@ export function LearnPage() {
     setErrorMessage(null);
     try {
       await updateProgress(session, currentWord.id, status);
+      setProgress((current) => ({ ...current, [currentWord.id]: status }));
       moveWord(1);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar tu progreso.");
@@ -62,6 +69,7 @@ export function LearnPage() {
         </div>
         {currentWord.audios[0] ? <audio className="mt-6 w-full" controls src={currentWord.audios[0].url} /> : null}
         <p className="mt-6 text-center text-3xl font-semibold text-slate-950">{currentWord.term}</p>
+        {progress[currentWord.id] ? <p className="mt-2 text-center text-sm text-slate-500">Estado guardado: {progress[currentWord.id]}</p> : null}
         <button className="translation-button" onClick={() => setIsTranslationVisible((visible) => !visible)}>
           <span className={isTranslationVisible ? "" : "translation-hidden"}>{currentWord.translationEs}</span>
         </button>

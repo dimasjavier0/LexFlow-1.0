@@ -83,3 +83,12 @@ export async function updateProgress(session: Session, wordId: string, status: L
 
   if (!response.ok) throw new Error("No se pudo guardar tu progreso.");
 }
+
+export async function getProgress(session: Session): Promise<Record<string, LearningStatus>> {
+  const response = await fetch(`${apiUrl}/progress`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (!response.ok) throw new Error("No se pudo cargar tu progreso.");
+  const body = (await response.json()) as { progress: Array<{ wordId: string; status: LearningStatus }> };
+  return Object.fromEntries(body.progress.map((item) => [item.wordId, item.status]));
+}
