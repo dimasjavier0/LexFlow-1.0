@@ -14,6 +14,9 @@ export function AdminPage() {
   const [term, setTerm] = useState("");
   const [translationEs, setTranslationEs] = useState("");
   const [level, setLevel] = useState("A1");
+  const [selectedWordId, setSelectedWordId] = useState("");
+  const [mediaType, setMediaType] = useState("image");
+  const [mediaUrl, setMediaUrl] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +77,35 @@ export function AdminPage() {
     setMessage("Palabra añadida.");
   };
 
+  const togglePublication = async (kind: "collection" | "word", id: string, isPublished: boolean) => {
+    if (!session) return;
+    const path = kind === "collection" ? `/admin/collections/${id}/publication` : `/admin/words/${id}/publication`;
+    const response = await fetch(`${apiUrl}${path}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublished: !isPublished }),
+    });
+    if (!response.ok) {
+      setMessage("No se pudo cambiar la publicación.");
+      return;
+    }
+    if (kind === "collection") setCollections((current) => current.map((item) => item.id === id ? { ...item, isPublished: !isPublished } : item));
+    else setWords((current) => current.map((item) => item.word.id === id ? { ...item, word: { ...item.word, isPublished: !isPublished } } : item));
+    setMessage("Publicación actualizada.");
+  };
+
+  const createMedia = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session || !selectedWordId) return;
+    const response = await fetch(`${apiUrl}/admin/words/${selectedWordId}/media`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ type: mediaType, url: mediaUrl }),
+    });
+    setMessage(response.ok ? "Recurso añadido." : "No se pudo añadir el recurso.");
+    if (response.ok) setMediaUrl("");
+  };
+
   return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
     <p className="eyebrow">ADMIN</p>
     <h1 className="mt-2 text-4xl font-bold text-slate-950">Colecciones</h1>
@@ -83,7 +115,7 @@ export function AdminPage() {
       <button className="primary-button" type="submit">Crear colección</button>
     </form>
     {message ? <p className="mt-4 text-slate-600">{message}</p> : null}
-    <ul className="admin-list">{collections.map((collection) => <li key={collection.id}><strong>{collection.name}</strong><span>{collection.slug} · {collection.isPublished ? "Publicada" : "Borrador"}</span></li>)}</ul>
+    <ul className="admin-list">{collections.map((collection) => <li key={collection.id}><strong>{collection.name}</strong><span>{collection.slug} · {collection.isPublished ? "Publicada" : "Borrador"} <button className="inline-action" onClick={() => void togglePublication("collection", collection.id, collection.isPublished)}>{collection.isPublished ? "Ocultar" : "Publicar"}</button></span></li>)}</ul>
     <section className="admin-section">
       <h2 className="text-2xl font-semibold text-slate-950">Palabras</h2>
       <select className="admin-select" value={selectedCollectionId} onChange={(event) => setSelectedCollectionId(event.target.value)}>
@@ -96,7 +128,8 @@ export function AdminPage() {
         <select className="admin-select" value={level} onChange={(event) => setLevel(event.target.value)}><option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option></select>
         <button className="primary-button" type="submit">Añadir palabra</button>
       </form> : null}
-      <ul className="admin-list">{words.map(({ word }) => <li key={word.id}><strong>{word.term}</strong><span>{word.translationEs} · {word.level}</span></li>)}</ul>
+      <ul className="admin-list">{words.map(({ word }) => <li key={word.id}><strong>{word.term}</strong><span>{word.translationEs} · {word.level} · {word.isPublished ? "Publicada" : "Borrador"} <button className="inline-action" onClick={() => void togglePublication("word", word.id, word.isPublished)}>{word.isPublished ? "Ocultar" : "Publicar"}</button><button className="inline-action" onClick={() => setSelectedWordId(word.id)}>Multimedia</button></span></li>)}</ul>
+      {selectedWordId ? <form className="admin-form" onSubmit={(event) => void createMedia(event)}><h3 className="text-xl font-semibold text-slate-950">Añadir recurso</h3><select className="admin-select" value={mediaType} onChange={(event) => setMediaType(event.target.value)}><option value="image">Imagen</option><option value="audio">Audio</option><option value="video">Video</option></select><input required type="url" placeholder="URL del recurso" value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} /><button className="primary-button" type="submit">Guardar recurso</button></form> : null}
     </section>
   </main>;
 }

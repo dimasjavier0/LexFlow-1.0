@@ -26,6 +26,7 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .admin-section { margin-top: 48px; }
 .admin-list { display: grid; gap: 10px; padding: 0; margin-top: 32px; list-style: none; }
 .admin-list li { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+.inline-action { margin-left: 8px; border: 0; color: #0e7490; background: transparent; cursor: pointer; font: inherit; font-weight: 600; }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }
 html { background: #f8fafc; }
