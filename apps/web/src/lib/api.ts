@@ -14,6 +14,48 @@ export type ApiUser = {
   updatedAt: string;
 };
 
+export type ApiCollectionSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  _count: { words: number };
+};
+
+export type ApiWord = {
+  id: string;
+  term: string;
+  translationEs: string;
+  level: string;
+  images: Array<{ id: string; url: string; attribution: string | null }>;
+  audios: Array<{ id: string; url: string }>;
+  videos: Array<{ id: string; url: string }>;
+};
+
+export type ApiCollection = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  words: Array<{ position: number; word: ApiWord }>;
+};
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${apiUrl}${path}`);
+  if (!response.ok) throw new Error("No se pudieron cargar los datos.");
+  return (await response.json()) as T;
+}
+
+export async function getCollections(): Promise<ApiCollectionSummary[]> {
+  const body = await getJson<{ collections: ApiCollectionSummary[] }>("/collections");
+  return body.collections;
+}
+
+export async function getCollection(slug: string): Promise<ApiCollection> {
+  const body = await getJson<{ collection: ApiCollection }>(`/collections/${encodeURIComponent(slug)}`);
+  return body.collection;
+}
+
 export async function getCurrentUser(session: Session): Promise<ApiUser> {
   const response = await fetch(`${apiUrl}/me`, {
     headers: { Authorization: `Bearer ${session.access_token}` },

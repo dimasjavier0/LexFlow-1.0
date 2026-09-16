@@ -7,6 +7,14 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .primary-button { width: 100%; margin-top: 24px; padding: 12px 16px; border: 0; border-radius: 8px; color: white; background: #0f172a; cursor: pointer; font: inherit; }
 .primary-button:disabled { cursor: wait; opacity: 0.65; }
 .error-message { color: #b91c1c; font-size: 0.875rem; }
+.secondary-button { display: inline-block; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; background: white; cursor: pointer; font: inherit; text-decoration: none; }
+.collection-card { display: flex; min-height: 150px; flex-direction: column; justify-content: space-between; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; text-decoration: none; transition: border-color 160ms ease, transform 160ms ease; }
+.collection-card:hover { border-color: #0891b2; transform: translateY(-2px); }
+.learning-panel { padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; }
+.learning-image, .image-placeholder { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #e2e8f0; }
+.image-placeholder { display: grid; place-items: center; color: #64748b; }
+.translation-button { display: block; width: 100%; margin-top: 20px; border: 0; background: transparent; color: #0e7490; cursor: pointer; font: inherit; font-size: 1.25rem; }
+.translation-hidden { filter: blur(7px); user-select: none; }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }
 html { background: #f8fafc; }
