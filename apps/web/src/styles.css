@@ -1,3 +1,12 @@
+body { margin: 0; font-family: system-ui, sans-serif; }
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f8fafc; }
+.auth-panel { width: min(100%, 420px); padding: 40px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 20px 50px rgb(15 23 42 / 8%); }
+.eyebrow { color: #0e7490; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; }
+.auth-panel h1 { margin: 12px 0; color: #0f172a; font-size: 2.25rem; line-height: 1.1; }
+.auth-copy { color: #475569; }
+.primary-button { width: 100%; margin-top: 24px; padding: 12px 16px; border: 0; border-radius: 8px; color: white; background: #0f172a; cursor: pointer; font: inherit; }
+.primary-button:disabled { cursor: wait; opacity: 0.65; }
+.error-message { color: #b91c1c; font-size: 0.875rem; }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }
 html { background: #f8fafc; }
