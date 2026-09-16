@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/auth-context";
 const apiUrl = import.meta.env.VITE_API_URL;
 
 export function AdminPage() {
-  const { apiUser, session } = useAuth();
+  const { apiUser, isLoading, isSyncingUser, session } = useAuth();
   const [collections, setCollections] = useState<Array<{ id: string; name: string; slug: string; isPublished: boolean }>>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -18,6 +18,7 @@ export function AdminPage() {
       .then((body) => setCollections(body.collections));
   }, [apiUser?.role, session]);
 
+  if (isLoading || isSyncingUser) return <main className="auth-page">Comprobando permisos...</main>;
   if (apiUser?.role !== "ADMIN") return <Navigate to="/" replace />;
 
   const createCollection = async (event: React.FormEvent<HTMLFormElement>) => {

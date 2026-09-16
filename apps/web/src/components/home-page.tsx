@@ -22,9 +22,12 @@ export function HomePage() {
           <h1 className="mt-2 text-4xl font-bold text-slate-950">Elige una colección</h1>
           <p className="mt-3 text-slate-600">Aprende vocabulario con imagen, audio y contexto.</p>
         </div>
-        {isAuthenticated ? (
-          <button className="secondary-button" onClick={() => void signOut()}>Cerrar sesión</button>
-        ) : <Link className="secondary-button" to="/login">Iniciar sesión</Link>}
+        <div className="flex items-center gap-3">
+          {apiUser?.role === "ADMIN" ? <Link className="secondary-button" to="/admin">Panel admin</Link> : null}
+          {isAuthenticated ? (
+            <button className="secondary-button" onClick={() => void signOut()}>Cerrar sesión</button>
+          ) : <Link className="secondary-button" to="/login">Iniciar sesión</Link>}
+        </div>
       </header>
       {apiUser ? <p className="mt-6 text-sm text-slate-500">Conectado como {apiUser.email}</p> : null}
       {errorMessage ? <p className="mt-8 text-red-700">{errorMessage}</p> : null}
