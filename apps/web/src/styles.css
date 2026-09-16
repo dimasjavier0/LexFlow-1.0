@@ -15,6 +15,11 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .image-placeholder { display: grid; place-items: center; color: #64748b; }
 .translation-button { display: block; width: 100%; margin-top: 20px; border: 0; background: transparent; color: #0e7490; cursor: pointer; font: inherit; font-size: 1.25rem; }
 .translation-hidden { filter: blur(7px); user-select: none; }
+.progress-actions { display: grid; gap: 10px; margin-top: 24px; }
+.progress-actions button { padding: 12px 14px; border: 0; border-radius: 8px; color: white; background: #0f172a; cursor: pointer; font: inherit; }
+.progress-actions button:nth-child(2) { background: #64748b; }
+.progress-actions button:nth-child(3) { background: #047857; }
+.progress-actions button:disabled { cursor: wait; opacity: 0.6; }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }
 html { background: #f8fafc; }

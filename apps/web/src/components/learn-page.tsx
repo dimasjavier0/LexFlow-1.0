@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCollection, type ApiCollection } from "../lib/api";
+import { updateProgress, type LearningStatus } from "../lib/api";
+import { useAuth } from "../contexts/auth-context";
 
 export function LearnPage() {
   const { collectionSlug = "" } = useParams();
@@ -8,6 +10,8 @@ export function LearnPage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [isTranslationVisible, setIsTranslationVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const { session } = useAuth();
 
   useEffect(() => {
     setWordIndex(0);
@@ -26,6 +30,20 @@ export function LearnPage() {
   const moveWord = (direction: -1 | 1) => {
     setWordIndex((currentIndex) => (currentIndex + direction + collection.words.length) % collection.words.length);
     setIsTranslationVisible(false);
+  };
+
+  const saveProgress = async (status: LearningStatus) => {
+    if (!session || isSaving) return;
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateProgress(session, currentWord.id, status);
+      moveWord(1);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar tu progreso.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -48,6 +66,11 @@ export function LearnPage() {
           <span className={isTranslationVisible ? "" : "translation-hidden"}>{currentWord.translationEs}</span>
         </button>
         {currentWord.videos[0] ? <a className="mt-6 block text-center text-cyan-700" href={currentWord.videos[0].url} target="_blank" rel="noreferrer">Ver contexto en video</a> : null}
+        <div className="progress-actions">
+          <button disabled={isSaving} onClick={() => void saveProgress("WANT_TO_LEARN")}>Quiero aprender</button>
+          <button disabled={isSaving} onClick={() => void saveProgress("NOT_INTERESTED")}>No me interesa</button>
+          <button disabled={isSaving} onClick={() => void saveProgress("LEARNED")}>Ya la aprendí</button>
+        </div>
       </section>
     </main>
   );

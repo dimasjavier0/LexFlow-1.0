@@ -68,3 +68,18 @@ export async function getCurrentUser(session: Session): Promise<ApiUser> {
   const body = (await response.json()) as { user: ApiUser };
   return body.user;
 }
+
+export type LearningStatus = "WANT_TO_LEARN" | "NOT_INTERESTED" | "LEARNED";
+
+export async function updateProgress(session: Session, wordId: string, status: LearningStatus): Promise<void> {
+  const response = await fetch(`${apiUrl}/progress/${encodeURIComponent(wordId)}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!response.ok) throw new Error("No se pudo guardar tu progreso.");
+}
