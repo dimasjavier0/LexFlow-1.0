@@ -7,8 +7,13 @@ const apiUrl = import.meta.env.VITE_API_URL;
 export function AdminPage() {
   const { apiUser, isLoading, isSyncingUser, session } = useAuth();
   const [collections, setCollections] = useState<Array<{ id: string; name: string; slug: string; isPublished: boolean }>>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState("");
+  const [words, setWords] = useState<Array<{ position: number; word: { id: string; term: string; translationEs: string; level: string; isPublished: boolean } }>>([]);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [term, setTerm] = useState("");
+  const [translationEs, setTranslationEs] = useState("");
+  const [level, setLevel] = useState("A1");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,6 +22,16 @@ export function AdminPage() {
       .then((response) => response.json() as Promise<{ collections: typeof collections }>)
       .then((body) => setCollections(body.collections));
   }, [apiUser?.role, session]);
+
+  useEffect(() => {
+    if (!session || !selectedCollectionId) {
+      setWords([]);
+      return;
+    }
+    void fetch(`${apiUrl}/admin/collections/${selectedCollectionId}/words`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then((response) => response.json() as Promise<{ words: typeof words }>)
+      .then((body) => setWords(body.words));
+  }, [selectedCollectionId, session]);
 
   if (isLoading || isSyncingUser) return <main className="auth-page">Comprobando permisos...</main>;
   if (apiUser?.role !== "ADMIN") return <Navigate to="/" replace />;
@@ -40,6 +55,25 @@ export function AdminPage() {
     setMessage("Colección creada.");
   };
 
+  const createWord = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session || !selectedCollectionId) return;
+    const response = await fetch(`${apiUrl}/admin/collections/${selectedCollectionId}/words`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ term, translationEs, level, isPublished: false }),
+    });
+    if (!response.ok) {
+      setMessage("No se pudo crear o asociar la palabra.");
+      return;
+    }
+    const body = (await response.json()) as { word: (typeof words)[number] };
+    setWords((current) => [...current, body.word]);
+    setTerm("");
+    setTranslationEs("");
+    setMessage("Palabra añadida.");
+  };
+
   return <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
     <p className="eyebrow">ADMIN</p>
     <h1 className="mt-2 text-4xl font-bold text-slate-950">Colecciones</h1>
@@ -50,5 +84,19 @@ export function AdminPage() {
     </form>
     {message ? <p className="mt-4 text-slate-600">{message}</p> : null}
     <ul className="admin-list">{collections.map((collection) => <li key={collection.id}><strong>{collection.name}</strong><span>{collection.slug} · {collection.isPublished ? "Publicada" : "Borrador"}</span></li>)}</ul>
+    <section className="admin-section">
+      <h2 className="text-2xl font-semibold text-slate-950">Palabras</h2>
+      <select className="admin-select" value={selectedCollectionId} onChange={(event) => setSelectedCollectionId(event.target.value)}>
+        <option value="">Selecciona una colección</option>
+        {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+      </select>
+      {selectedCollectionId ? <form className="admin-form" onSubmit={(event) => void createWord(event)}>
+        <input required placeholder="Palabra en inglés" value={term} onChange={(event) => setTerm(event.target.value)} />
+        <input required placeholder="Traducción al español" value={translationEs} onChange={(event) => setTranslationEs(event.target.value)} />
+        <select className="admin-select" value={level} onChange={(event) => setLevel(event.target.value)}><option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option></select>
+        <button className="primary-button" type="submit">Añadir palabra</button>
+      </form> : null}
+      <ul className="admin-list">{words.map(({ word }) => <li key={word.id}><strong>{word.term}</strong><span>{word.translationEs} · {word.level}</span></li>)}</ul>
+    </section>
   </main>;
 }

@@ -22,6 +22,8 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .progress-actions button:disabled { cursor: wait; opacity: 0.6; }
 .admin-form { display: grid; gap: 12px; max-width: 520px; margin-top: 28px; }
 .admin-form input { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.admin-select { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; font: inherit; }
+.admin-section { margin-top: 48px; }
 .admin-list { display: grid; gap: 10px; padding: 0; margin-top: 32px; list-style: none; }
 .admin-list li { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
 @import "tailwindcss";
