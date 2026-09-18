@@ -27,6 +27,42 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .admin-list { display: grid; gap: 10px; padding: 0; margin-top: 32px; list-style: none; }
 .admin-list li { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
 .inline-action { margin-left: 8px; border: 0; color: #0e7490; background: transparent; cursor: pointer; font: inherit; font-weight: 600; }
+.admin-shell { min-height: 100vh; padding: 48px max(24px, calc((100vw - 1120px) / 2)); background: #f1f5f9; color: #0f172a; }
+.admin-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.admin-header h1 { margin: 8px 0; font-size: clamp(2rem, 5vw, 4rem); letter-spacing: -0.03em; }
+.admin-header p:not(.eyebrow) { margin: 0; color: #64748b; }
+.role-badge { padding: 8px 12px; border-radius: 999px; color: #075985; background: #e0f2fe; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; }
+.action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 40px 0 24px; }
+.action-card { display: grid; gap: 8px; min-height: 150px; padding: 22px; border: 1px solid #dbe3ec; border-radius: 14px; color: #0f172a; background: white; text-decoration: none; transition: transform 160ms ease, border-color 160ms ease; }
+.action-card:hover, .action-card-active { border-color: #0891b2; transform: translateY(-2px); }
+.action-icon { color: #0891b2; font-size: 2rem; }
+.action-card small, .collection-toggle small, .word-row small { display: block; color: #64748b; font-size: 0.85rem; }
+.admin-panel { margin-top: 24px; padding: 28px; border: 1px solid #dbe3ec; border-radius: 14px; background: white; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.panel-heading h2 { margin: 4px 0 0; font-size: 1.6rem; }
+.panel-heading > span { color: #64748b; font-size: 0.85rem; }
+.collection-stack { display: grid; gap: 8px; }
+.collection-item { overflow: hidden; border: 1px solid #e2e8f0; border-radius: 10px; }
+.collection-toggle, .word-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; border: 0; color: inherit; background: white; cursor: pointer; text-align: left; font: inherit; }
+.collection-toggle:hover, .word-row:hover { background: #f8fafc; }
+.collection-toggle > span:nth-child(2), .word-row > span:first-child { flex: 1; }
+.collection-toggle em { color: #64748b; font-size: 0.8rem; font-style: normal; }
+.chevron { width: 20px; color: #0891b2; font-size: 1.5rem; }
+.nested-words { display: grid; gap: 1px; padding: 8px; background: #e2e8f0; }
+.word-row { padding: 12px; background: #f8fafc; }
+.word-row > span:last-child { color: #64748b; font-size: 0.8rem; }
+.admin-form-wide { max-width: none; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr 150px; gap: 14px; }
+.admin-form label { display: grid; gap: 7px; color: #475569; font-size: 0.85rem; font-weight: 600; }
+.admin-form label input, .admin-form label select { width: 100%; box-sizing: border-box; }
+.drop-zone { position: relative; display: grid; min-height: 180px; place-items: center; border: 2px dashed #94a3b8; border-radius: 12px; background: #f8fafc; text-align: center; transition: border-color 160ms ease, background 160ms ease; }
+.drop-zone:hover { border-color: #0891b2; background: #ecfeff; }
+.drop-zone input { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; opacity: 0; }
+.drop-zone label { display: grid; gap: 8px; pointer-events: none; }
+.drop-zone small { color: #64748b; }
+.admin-message { margin: 20px 0 0; padding: 12px 14px; border-left: 3px solid #0891b2; color: #0f766e; background: #ecfeff; }
+.empty-state { padding: 20px; color: #64748b; text-align: center; }
+@media (max-width: 760px) { .action-grid, .form-grid { grid-template-columns: 1fr; } .admin-shell { padding: 28px 16px; } .admin-header { flex-direction: column; } .admin-panel { padding: 20px; } }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }
 html { background: #f8fafc; }
