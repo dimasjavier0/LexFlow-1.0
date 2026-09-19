@@ -3,7 +3,7 @@ import { useAuth } from "../contexts/auth-context";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 type CollectionOption = { id: string; name: string };
-export type EditableWord = { id: string; term: string; translationEs: string; level: string; isPublished: boolean };
+export type EditableWord = { id: string; term: string; translationEs: string; level: string; isPublished: boolean; images?: Array<{ id: string; url: string }>; videos?: Array<{ id: string; url: string }> };
 
 type WordEditorProps = {
   word?: EditableWord;
@@ -19,7 +19,8 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [translation, setTranslation] = useState(word?.translationEs ?? "");
   const [level, setLevel] = useState(word?.level ?? "A1");
   const [collectionId, setCollectionId] = useState(initialCollectionId);
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(word?.images?.[0]?.url ?? "");
+  const [videoUrl, setVideoUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -42,8 +43,15 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
 
   const saveImageLink = async (wordId: string) => {
     if (!imageUrl || !session) return;
+    if (word?.images?.some((image) => image.url === imageUrl)) return;
     const response = await fetch(`${apiUrl}/admin/words/${wordId}/media`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "image", url: imageUrl }) });
     if (!response.ok) throw new Error("La palabra se guardó, pero el enlace de imagen no pudo guardarse.");
+  };
+
+  const saveVideoLink = async (wordId: string) => {
+    if (!videoUrl || !session) return;
+    const response = await fetch(`${apiUrl}/admin/words/${wordId}/media`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "video", url: videoUrl }) });
+    if (!response.ok) throw new Error("La palabra se guardó, pero el video no pudo asociarse.");
   };
 
   const submit = async (event: FormEvent) => {
@@ -58,6 +66,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
       const savedWord = "word" in body.word ? body.word.word : body.word;
       await uploadFile(savedWord.id);
       await saveImageLink(savedWord.id);
+      await saveVideoLink(savedWord.id);
       onSaved(savedWord, collectionId);
     } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar la palabra."); }
     finally { setIsSaving(false); }
@@ -70,8 +79,15 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     <div className="editor-heading"><div><p className="eyebrow">{word ? "EDITAR PALABRA" : "NUEVA PALABRA"}</p><h3>{word ? word.term : "Crear palabra"}</h3></div><button className="modal-close" type="button" onClick={onCancel} aria-label="Cerrar">×</button></div>
     <div className="form-grid"><label>Palabra<input required value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" /></label><label>Traducción<input required value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" /></label><label>Nivel<select value={level} onChange={(event) => setLevel(event.target.value)}>{["A1", "A2", "B1", "B2", "C1", "C2"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
     {!word ? <label>Colección<select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Selecciona una colección</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label> : null}
-    <label>Enlace de imagen<input type="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." /></label>
-    <div className="drop-zone compact-drop" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}><input id={`image-${word?.id ?? "new"}`} type="file" accept="image/*" onChange={onFileChange} /><label htmlFor={`image-${word?.id ?? "new"}`}><strong>{imageFile ? imageFile.name : "Arrastra una imagen aquí"}</strong><small>o pulsa para seleccionar · máximo 10 MB</small></label></div>
+    {word?.images?.length ? <div className="media-list"><strong>Imágenes asociadas</strong>{word.images.map((image) => <a key={image.id} href={image.url} target="_blank" rel="noreferrer">{image.url}</a>)}</div> : null}
+    <label>Agregar enlace de imagen<input type="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." /></label>
+    <div className="drop-zone compact-drop" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+      <input id={`image-${word?.id ?? "new"}`} type="file" accept="image/*" onChange={onFileChange} />
+      {imageFile || imageUrl || word?.images?.[0] ? <img className="editor-image-preview" src={imageFile ? URL.createObjectURL(imageFile) : imageUrl || word?.images?.[0]?.url} alt="Vista previa de la imagen" /> : null}
+      <label htmlFor={`image-${word?.id ?? "new"}`}><strong>{imageFile ? imageFile.name : imageUrl ? "Imagen actual" : "Arrastra una imagen aquí"}</strong><small>o pulsa para seleccionar · máximo 10 MB</small></label>
+    </div>
+    {word?.videos?.length ? <div className="media-list"><strong>Videos asociados</strong>{word.videos.map((video) => <a key={video.id} href={video.url} target="_blank" rel="noreferrer">{video.url}</a>)}</div> : null}
+    <label>Agregar enlace de video<input type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://..." /></label>
     {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
     <div className="editor-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar palabra"}</button></div>
   </form>;

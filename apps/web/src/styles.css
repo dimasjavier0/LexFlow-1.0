@@ -73,6 +73,13 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .editor-actions .primary-button { width: auto; margin-top: 0; }
 .editor-actions .secondary-button { align-self: center; }
 .compact-drop { min-height: 120px; }
+.media-list { display: grid; gap: 6px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569; font-size: 0.85rem; }
+.media-list a { overflow: hidden; color: #0e7490; text-overflow: ellipsis; white-space: nowrap; }
+.editor-image-preview { width: 100%; max-height: 140px; object-fit: contain; border-radius: 8px; background: #e2e8f0; }
+.media-carousel { display: grid; gap: 10px; }
+.carousel-controls { display: flex; align-items: center; justify-content: center; gap: 18px; color: #64748b; }
+.video-carousel { margin-top: 18px; }
+.editor-image-preview { width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; background: #e2e8f0; }
 @media (max-width: 760px) { .action-grid, .form-grid { grid-template-columns: 1fr; } .admin-shell { padding: 28px 16px; } .admin-header { flex-direction: column; } .admin-panel { padding: 20px; } }
 @import "tailwindcss";
 @theme { --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; }

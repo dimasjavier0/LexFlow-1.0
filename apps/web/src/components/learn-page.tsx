@@ -12,11 +12,15 @@ export function LearnPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [progress, setProgress] = useState<Record<string, string>>({});
+  const [imageIndex, setImageIndex] = useState(0);
+  const [videoIndex, setVideoIndex] = useState(0);
   const { session } = useAuth();
 
   useEffect(() => {
     setWordIndex(0);
     setIsTranslationVisible(false);
+    setImageIndex(0);
+    setVideoIndex(0);
     void getCollection(collectionSlug).then(setCollection).catch((error: unknown) => {
       setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar la colección.");
     });
@@ -36,6 +40,16 @@ export function LearnPage() {
   const moveWord = (direction: -1 | 1) => {
     setWordIndex((currentIndex) => (currentIndex + direction + collection.words.length) % collection.words.length);
     setIsTranslationVisible(false);
+    setImageIndex(0);
+    setVideoIndex(0);
+  };
+
+  const moveImage = (direction: -1 | 1) => {
+    setImageIndex((currentIndex) => (currentIndex + direction + currentWord.images.length) % currentWord.images.length);
+  };
+
+  const moveVideo = (direction: -1 | 1) => {
+    setVideoIndex((currentIndex) => (currentIndex + direction + currentWord.videos.length) % currentWord.videos.length);
   };
 
   const saveProgress = async (status: LearningStatus) => {
@@ -61,19 +75,15 @@ export function LearnPage() {
         <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">{currentWord.level}</span>
       </div>
       <section className="learning-panel mt-8">
-        {currentWord.images[0] ? <img className="learning-image" src={currentWord.images[0].url} alt={currentWord.term} /> : <div className="image-placeholder">Imagen pendiente</div>}
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <button className="secondary-button" onClick={() => moveWord(-1)}>←</button>
-          <span className="text-sm text-slate-500">{wordIndex + 1} / {collection.words.length}</span>
-          <button className="secondary-button" onClick={() => moveWord(1)}>→</button>
-        </div>
+        {currentWord.images.length ? <div className="media-carousel"><img className="learning-image" src={currentWord.images[imageIndex].url} alt={`${currentWord.term} ${imageIndex + 1}`} /><div className="carousel-controls"><button className="secondary-button" onClick={() => moveImage(-1)}>←</button><span>{imageIndex + 1} / {currentWord.images.length}</span><button className="secondary-button" onClick={() => moveImage(1)}>→</button></div></div> : <div className="image-placeholder">Imagen pendiente</div>}
+        <div className="mt-6 flex items-center justify-between gap-4"><button className="secondary-button" onClick={() => moveWord(-1)}>←</button><span className="text-sm text-slate-500">Palabra {wordIndex + 1} / {collection.words.length}</span><button className="secondary-button" onClick={() => moveWord(1)}>→</button></div>
         {currentWord.audios[0] ? <audio className="mt-6 w-full" controls src={currentWord.audios[0].url} /> : null}
         <p className="mt-6 text-center text-3xl font-semibold text-slate-950">{currentWord.term}</p>
         {progress[currentWord.id] ? <p className="mt-2 text-center text-sm text-slate-500">Estado guardado: {progress[currentWord.id]}</p> : null}
         <button className="translation-button" onClick={() => setIsTranslationVisible((visible) => !visible)}>
           <span className={isTranslationVisible ? "" : "translation-hidden"}>{currentWord.translationEs}</span>
         </button>
-        {currentWord.videos[0] ? <a className="mt-6 block text-center text-cyan-700" href={currentWord.videos[0].url} target="_blank" rel="noreferrer">Ver contexto en video</a> : null}
+        {currentWord.videos.length ? <div className="media-carousel video-carousel"><a className="mt-6 block text-center text-cyan-700" href={currentWord.videos[videoIndex].url} target="_blank" rel="noreferrer">Ver contexto en video {videoIndex + 1}</a><div className="carousel-controls"><button className="secondary-button" onClick={() => moveVideo(-1)}>←</button><span>{videoIndex + 1} / {currentWord.videos.length}</span><button className="secondary-button" onClick={() => moveVideo(1)}>→</button></div></div> : null}
         <div className="progress-actions">
           <button disabled={isSaving} onClick={() => void saveProgress("WANT_TO_LEARN")}>Quiero aprender</button>
           <button disabled={isSaving} onClick={() => void saveProgress("NOT_INTERESTED")}>No me interesa</button>
