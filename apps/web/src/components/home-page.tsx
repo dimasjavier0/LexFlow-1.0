@@ -15,32 +15,34 @@ export function HomePage() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-screen max-w-4xl px-6 py-12">
-      <header className="flex items-start justify-between gap-6">
-        <div>
-          <p className="eyebrow">LEXFLOW</p>
-          <h1 className="mt-2 text-4xl font-bold text-slate-950">Elige una colección</h1>
-          <p className="mt-3 text-slate-600">Aprende vocabulario con imagen, audio y contexto.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {apiUser?.role === "ADMIN" ? <Link className="secondary-button" to="/admin">Panel admin</Link> : null}
-          {isAuthenticated ? (
-            <button className="secondary-button" onClick={() => void signOut()}>Cerrar sesión</button>
-          ) : <Link className="secondary-button" to="/login">Iniciar sesión</Link>}
-        </div>
+    <main className="app-shell home-shell">
+      <header className="topbar">
+        <Link className="brand-mark" to="/" aria-label="LexFlow inicio"><span className="brand-dot" />LEXFLOW</Link>
+        <nav className="topbar-actions" aria-label="Navegación principal">
+          {apiUser?.role === "ADMIN" ? <Link className="icon-button" to="/admin" title="Panel admin" aria-label="Panel admin">+</Link> : null}
+          {isAuthenticated ? <button className="text-button" onClick={() => void signOut()}>Salir</button> : <Link className="text-button" to="/login">Iniciar sesión</Link>}
+        </nav>
       </header>
-      {apiUser ? <p className="mt-6 text-sm text-slate-500">Conectado como {apiUser.email}</p> : null}
-      {errorMessage ? <p className="mt-8 text-red-700">{errorMessage}</p> : null}
-      <section className="mt-10 grid gap-4 sm:grid-cols-2">
+      <section className="home-intro">
+        <p className="eyebrow">TU RUTA DE VOCABULARIO</p>
+        <h1>Aprende una palabra cada vez.</h1>
+        <p>Descubre vocabulario con imágenes, audio y contexto.</p>
+        {apiUser ? <span className="user-note">Conectado como {apiUser.email}</span> : null}
+      </section>
+      {errorMessage ? <p className="error-message page-message">{errorMessage}</p> : null}
+      <section className="collection-grid" aria-label="Colecciones de vocabulario">
         {collections.map((collection) => (
           <Link className="collection-card" key={collection.id} to={`/learn/${collection.slug}`}>
+            <div className="collection-card-top"><span className="collection-icon">{collection.name.slice(0, 1).toUpperCase()}</span><span className="card-arrow">↗</span></div>
             <div>
-              <h2 className="text-2xl font-semibold text-slate-950">{collection.name}</h2>
-              <p className="mt-2 text-slate-600">{collection.description ?? "Colección de vocabulario"}</p>
+              <p className="card-kicker">COLECCIÓN</p>
+              <h2>{collection.name}</h2>
+              <p>{collection.description ?? "Colección de vocabulario"}</p>
             </div>
-            <span className="text-sm font-medium text-cyan-700">{collection._count.words} palabras →</span>
+            <span className="card-meta">{collection._count.words} palabras <span>Comenzar</span></span>
           </Link>
         ))}
+        {!collections.length && !errorMessage ? <p className="empty-state">Todavía no hay colecciones publicadas.</p> : null}
       </section>
     </main>
   );

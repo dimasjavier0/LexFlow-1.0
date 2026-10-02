@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/auth-context";
 
 export function LoginPage() {
@@ -24,7 +24,8 @@ export function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-panel">
-        <p className="eyebrow">LEXFLOW</p>
+        <Link className="brand-mark" to="/"><span className="brand-dot" />LEXFLOW</Link>
+        <div className="auth-illustration" aria-hidden="true"><span>abc</span><strong>+</strong></div>
         <h1>Aprende palabras en contexto.</h1>
         <p className="auth-copy">Inicia sesión para continuar con tu aprendizaje.</p>
         <button className="primary-button" disabled={isSigningIn} onClick={() => void handleGoogleLogin()}>

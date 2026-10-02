@@ -31,11 +31,11 @@ export function LearnPage() {
     void getProgress(session).then(setProgress).catch(() => undefined);
   }, [session]);
 
-  if (errorMessage) return <main className="auth-page"><p className="text-red-700">{errorMessage}</p></main>;
-  if (!collection) return <main className="auth-page">Cargando colección...</main>;
+  if (errorMessage) return <main className="status-page"><p className="error-message">{errorMessage}</p></main>;
+  if (!collection) return <main className="status-page"><span className="loading-mark" />Cargando colección...</main>;
 
   const currentWord = collection.words[wordIndex]?.word;
-  if (!currentWord) return <main className="auth-page">Esta colección aún no tiene palabras.</main>;
+  if (!currentWord) return <main className="status-page">Esta colección aún no tiene palabras.</main>;
 
   const moveWord = (direction: -1 | 1) => {
     setWordIndex((currentIndex) => (currentIndex + direction + collection.words.length) % collection.words.length);
@@ -68,27 +68,20 @@ export function LearnPage() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-10">
-      <Link className="text-sm font-medium text-cyan-700" to="/">← Colecciones</Link>
-      <div className="mt-8 flex items-start justify-between gap-4">
-        <div><p className="eyebrow">{collection.name}</p><h1 className="mt-2 text-4xl font-bold text-slate-950">{currentWord.term}</h1></div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">{currentWord.level}</span>
-      </div>
-      <section className="learning-panel mt-8">
-        {currentWord.images.length ? <div className="media-carousel"><img className="learning-image" src={currentWord.images[imageIndex].url} alt={`${currentWord.term} ${imageIndex + 1}`} /><div className="carousel-controls"><button className="secondary-button" onClick={() => moveImage(-1)}>←</button><span>{imageIndex + 1} / {currentWord.images.length}</span><button className="secondary-button" onClick={() => moveImage(1)}>→</button></div></div> : <div className="image-placeholder">Imagen pendiente</div>}
-        <div className="mt-6 flex items-center justify-between gap-4"><button className="secondary-button" onClick={() => moveWord(-1)}>←</button><span className="text-sm text-slate-500">Palabra {wordIndex + 1} / {collection.words.length}</span><button className="secondary-button" onClick={() => moveWord(1)}>→</button></div>
-        {currentWord.audios[0] ? <audio className="mt-6 w-full" controls src={currentWord.audios[0].url} /> : null}
-        <p className="mt-6 text-center text-3xl font-semibold text-slate-950">{currentWord.term}</p>
-        {progress[currentWord.id] ? <p className="mt-2 text-center text-sm text-slate-500">Estado guardado: {progress[currentWord.id]}</p> : null}
-        <button className="translation-button" onClick={() => setIsTranslationVisible((visible) => !visible)}>
-          <span className={isTranslationVisible ? "" : "translation-hidden"}>{currentWord.translationEs}</span>
-        </button>
-        {currentWord.videos.length ? <div className="media-carousel video-carousel"><a className="mt-6 block text-center text-cyan-700" href={currentWord.videos[videoIndex].url} target="_blank" rel="noreferrer">Ver contexto en video {videoIndex + 1}</a><div className="carousel-controls"><button className="secondary-button" onClick={() => moveVideo(-1)}>←</button><span>{videoIndex + 1} / {currentWord.videos.length}</span><button className="secondary-button" onClick={() => moveVideo(1)}>→</button></div></div> : null}
-        <div className="progress-actions">
-          <button disabled={isSaving} onClick={() => void saveProgress("WANT_TO_LEARN")}>Quiero aprender</button>
-          <button disabled={isSaving} onClick={() => void saveProgress("NOT_INTERESTED")}>No me interesa</button>
-          <button disabled={isSaving} onClick={() => void saveProgress("LEARNED")}>Ya la aprendí</button>
-        </div>
+    <main className="app-shell learn-shell">
+      <header className="learn-topbar">
+        <Link className="back-link" to="/" aria-label="Volver a colecciones">← <span>Volver</span></Link>
+        <span className="learn-counter">{wordIndex + 1} / {collection.words.length}</span>
+        <span className="level-pill">{currentWord.level}</span>
+      </header>
+      <div className="learning-heading"><p className="eyebrow">{collection.name}</p><h1>{currentWord.term}</h1><div className="learning-progress" aria-label={`Palabra ${wordIndex + 1} de ${collection.words.length}`}><span style={{ width: `${((wordIndex + 1) / collection.words.length) * 100}%` }} /></div></div>
+      <section className="learning-panel">
+        {currentWord.images.length ? <div className="media-carousel image-stage"><img className="learning-image" src={currentWord.images[imageIndex].url} alt={`${currentWord.term} ${imageIndex + 1}`} /><div className="carousel-controls"><button className="round-button" onClick={() => moveImage(-1)} aria-label="Imagen anterior">←</button><span>{imageIndex + 1} / {currentWord.images.length}</span><button className="round-button" onClick={() => moveImage(1)} aria-label="Imagen siguiente">→</button></div></div> : <div className="image-placeholder">Imagen pendiente</div>}
+        <div className="word-tools"><button className="round-button" onClick={() => moveWord(-1)} aria-label="Palabra anterior">←</button><div>{currentWord.audios[0] ? <audio controls src={currentWord.audios[0].url} aria-label={`Pronunciación de ${currentWord.term}`} /> : <span className="audio-missing">Audio no disponible</span>}</div><button className="round-button" onClick={() => moveWord(1)} aria-label="Palabra siguiente">→</button></div>
+        <button className="translation-button" onClick={() => setIsTranslationVisible((visible) => !visible)} aria-label="Mostrar u ocultar traducción"><span className={isTranslationVisible ? "" : "translation-hidden"}>{currentWord.translationEs}</span><small>{isTranslationVisible ? "Traducción" : "Toca para descubrir la traducción"}</small></button>
+        {progress[currentWord.id] ? <p className="saved-status">Estado guardado: {progress[currentWord.id]}</p> : null}
+        {currentWord.videos.length ? <div className="video-link"><a href={currentWord.videos[videoIndex].url} target="_blank" rel="noreferrer">Ver contexto en video {videoIndex + 1} ↗</a><div className="carousel-controls"><button className="round-button" onClick={() => moveVideo(-1)} aria-label="Video anterior">←</button><span>{videoIndex + 1} / {currentWord.videos.length}</span><button className="round-button" onClick={() => moveVideo(1)} aria-label="Video siguiente">→</button></div></div> : null}
+        <div className="progress-actions"><button className="learn-action action-learn" disabled={isSaving} onClick={() => void saveProgress("WANT_TO_LEARN")}><span>+</span>Quiero aprender</button><button className="learn-action action-skip" disabled={isSaving} onClick={() => void saveProgress("NOT_INTERESTED")}>No me interesa</button><button className="learn-action action-done" disabled={isSaving} onClick={() => void saveProgress("LEARNED")}><span>✓</span>Ya la aprendí</button></div>
       </section>
     </main>
   );
