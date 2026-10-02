@@ -20,6 +20,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [level, setLevel] = useState(word?.level ?? "A1");
   const [collectionId, setCollectionId] = useState(initialCollectionId);
   const [imageUrl, setImageUrl] = useState(word?.images?.[0]?.url ?? "");
+  const [associatedImages, setAssociatedImages] = useState(word?.images ?? []);
   const [videoUrl, setVideoUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,6 +55,17 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     if (!response.ok) throw new Error("La palabra se guardó, pero el video no pudo asociarse.");
   };
 
+  const deleteImage = async (imageId: string) => {
+    if (!session) return;
+    setErrorMessage(null);
+    try {
+      const response = await fetch(`${apiUrl}/admin/images/${imageId}`, { method: "DELETE", headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!response.ok) throw new Error("No se pudo eliminar la imagen.");
+      setAssociatedImages((current) => current.filter((image) => image.id !== imageId));
+      setImageUrl((current) => current === associatedImages.find((image) => image.id === imageId)?.url ? "" : current);
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar la imagen."); }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!session || (!word && !collectionId)) { setErrorMessage("Selecciona una colección."); return; }
@@ -79,7 +91,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     <div className="editor-heading"><div><p className="eyebrow">{word ? "EDITAR PALABRA" : "NUEVA PALABRA"}</p><h3>{word ? word.term : "Crear palabra"}</h3></div><button className="modal-close" type="button" onClick={onCancel} aria-label="Cerrar">×</button></div>
     <div className="form-grid"><label>Palabra<input required value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" /></label><label>Traducción<input required value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" /></label><label>Nivel<select value={level} onChange={(event) => setLevel(event.target.value)}>{["A1", "A2", "B1", "B2", "C1", "C2"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
     {!word ? <label>Colección<select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Selecciona una colección</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label> : null}
-    {word?.images?.length ? <div className="media-list"><strong>Imágenes asociadas</strong>{word.images.map((image) => <a key={image.id} href={image.url} target="_blank" rel="noreferrer">{image.url}</a>)}</div> : null}
+    {associatedImages.length ? <div className="associated-media"><strong>Imágenes asociadas</strong><div className="associated-image-grid">{associatedImages.map((image) => <div className="associated-image-card" key={image.id}><img src={image.url} alt={`Imagen de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteImage(image.id)} aria-label={`Eliminar imagen ${image.url}`} title="Eliminar imagen">×</button><a href={image.url} target="_blank" rel="noreferrer">{image.url}</a></div>)}</div></div> : null}
     <label>Agregar enlace de imagen<input type="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." /></label>
     <div className="drop-zone compact-drop" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <input id={`image-${word?.id ?? "new"}`} type="file" accept="image/*" onChange={onFileChange} />
