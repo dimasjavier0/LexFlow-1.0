@@ -51,6 +51,10 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .nested-words { display: grid; gap: 1px; padding: 8px; background: #e2e8f0; }
 .word-row { padding: 12px; background: #f8fafc; }
 .word-row > span:last-child { color: #64748b; font-size: 0.8rem; }
+.quick-word-form { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) 92px auto; align-items: end; gap: 8px; margin: 12px 0 4px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.quick-word-form strong { grid-column: 1 / -1; color: var(--teal-dark); font-size: .78rem; }
+.quick-word-form input, .quick-word-form select { min-width: 0; box-sizing: border-box; width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: #fbfdfc; font: inherit; }
+.quick-word-form .primary-button { width: auto; min-height: 40px; margin-top: 0; padding: 9px 15px; }
 .admin-form-wide { max-width: none; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr 150px; gap: 14px; }
 .admin-form label { display: grid; gap: 7px; color: #475569; font-size: 0.85rem; font-weight: 600; }
@@ -205,6 +209,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 	.learn-action { font-size: .7rem; }
 	.auth-panel { padding: 25px 20px; }
 	.action-grid, .form-grid { grid-template-columns: 1fr; }
+	.quick-word-form { grid-template-columns: 1fr 1fr; }
+	.quick-word-form strong { grid-column: 1 / -1; }
+	.quick-word-form .primary-button { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) {
 	*, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
