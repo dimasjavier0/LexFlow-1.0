@@ -33,7 +33,7 @@ export function HomePage() {
       <section className="collection-grid" aria-label="Colecciones de vocabulario">
         {collections.map((collection) => (
           <Link className="collection-card" key={collection.id} to={`/learn/${collection.slug}`}>
-            <div className="collection-card-top"><span className="collection-icon">{collection.name.slice(0, 1).toUpperCase()}</span><span className="card-arrow">↗</span></div>
+            <div className="collection-card-top">{collection.imageUrl ? <img className="collection-thumbnail" src={collection.imageUrl} alt="" /> : <span className="collection-icon">{collection.name.slice(0, 1).toUpperCase()}</span>}<span className="card-arrow">↗</span></div>
             <div>
               <p className="card-kicker">COLECCIÓN</p>
               <h2>{collection.name}</h2>

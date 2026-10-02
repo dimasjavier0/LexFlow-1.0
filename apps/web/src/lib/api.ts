@@ -19,6 +19,7 @@ export type ApiCollectionSummary = {
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
   _count: { words: number };
 };
 
@@ -37,6 +38,7 @@ export type ApiCollection = {
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
   words: Array<{ position: number; word: ApiWord }>;
 };
 
