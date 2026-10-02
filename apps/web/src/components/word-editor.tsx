@@ -22,6 +22,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [imageUrl, setImageUrl] = useState(word?.images?.[0]?.url ?? "");
   const [associatedImages, setAssociatedImages] = useState(word?.images ?? []);
   const [videoUrl, setVideoUrl] = useState("");
+  const [associatedVideos, setAssociatedVideos] = useState(word?.videos ?? []);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,6 +67,16 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar la imagen."); }
   };
 
+  const deleteVideo = async (videoId: string) => {
+    if (!session) return;
+    setErrorMessage(null);
+    try {
+      const response = await fetch(`${apiUrl}/admin/videos/${videoId}`, { method: "DELETE", headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!response.ok) throw new Error("No se pudo eliminar el video.");
+      setAssociatedVideos((current) => current.filter((video) => video.id !== videoId));
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el video."); }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!session || (!word && !collectionId)) { setErrorMessage("Selecciona una colección."); return; }
@@ -98,7 +109,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
       {imageFile || imageUrl || word?.images?.[0] ? <img className="editor-image-preview" src={imageFile ? URL.createObjectURL(imageFile) : imageUrl || word?.images?.[0]?.url} alt="Vista previa de la imagen" /> : null}
       <label htmlFor={`image-${word?.id ?? "new"}`}><strong>{imageFile ? imageFile.name : imageUrl ? "Imagen actual" : "Arrastra una imagen aquí"}</strong><small>o pulsa para seleccionar · máximo 10 MB</small></label>
     </div>
-    {word?.videos?.length ? <div className="media-list"><strong>Videos asociados</strong>{word.videos.map((video) => <a key={video.id} href={video.url} target="_blank" rel="noreferrer">{video.url}</a>)}</div> : null}
+    {associatedVideos.length ? <div className="associated-media"><strong>Videos asociados</strong><div className="associated-video-grid">{associatedVideos.map((video) => <div className="associated-video-card" key={video.id}><video controls preload="metadata" src={video.url} aria-label={`Video de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteVideo(video.id)} aria-label={`Eliminar video ${video.url}`} title="Eliminar video">×</button><a href={video.url} target="_blank" rel="noreferrer">{video.url}</a></div>)}</div></div> : null}
     <label>Agregar enlace de video<input type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://..." /></label>
     {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
     <div className="editor-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar palabra"}</button></div>
