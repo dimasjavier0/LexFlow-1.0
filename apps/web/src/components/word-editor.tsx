@@ -3,7 +3,7 @@ import { useAuth } from "../contexts/auth-context";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 type CollectionOption = { id: string; name: string };
-export type EditableWord = { id: string; term: string; translationEs: string; level: string; isPublished: boolean; images?: Array<{ id: string; url: string }>; videos?: Array<{ id: string; url: string }> };
+export type EditableWord = { id: string; term: string; translationEs: string; level: string; isPublished: boolean; images?: Array<{ id: string; url: string }>; audios?: Array<{ id: string; url: string; voice?: string | null; accent?: string | null; provider?: string | null }>; videos?: Array<{ id: string; url: string }> };
 
 type WordEditorProps = {
   word?: EditableWord;
@@ -25,6 +25,9 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [associatedVideos, setAssociatedVideos] = useState(word?.videos ?? []);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [audios, setAudios] = useState(word?.audios ?? []);
+  const [audioAccent, setAudioAccent] = useState<"US" | "UK">("US");
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectFile = (file: File | undefined) => {
@@ -77,6 +80,19 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el video."); }
   };
 
+  const generateAudio = async () => {
+    if (!word || !session) return;
+    setIsGeneratingAudio(true);
+    setErrorMessage(null);
+    try {
+      const response = await fetch(`${apiUrl}/admin/words/${word.id}/audio/generate`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ accent: audioAccent }) });
+      const body = await response.json() as { audio?: NonNullable<EditableWord["audios"]>[number]; message?: string };
+      if (!response.ok || !body.audio) throw new Error(body.message ?? "No se pudo generar el audio.");
+      setAudios((current) => [...current, body.audio!]);
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo generar el audio."); }
+    finally { setIsGeneratingAudio(false); }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!session || (!word && !collectionId)) { setErrorMessage("Selecciona una colección."); return; }
@@ -103,6 +119,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     <div className="form-grid"><label>Palabra<input required value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" /></label><label>Traducción<input required value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" /></label><label>Nivel<select value={level} onChange={(event) => setLevel(event.target.value)}>{["A1", "A2", "B1", "B2", "C1", "C2"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
     {!word ? <label>Colección<select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Selecciona una colección</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label> : null}
     {associatedImages.length ? <div className="associated-media"><strong>Imágenes asociadas</strong><div className="associated-image-grid">{associatedImages.map((image) => <div className="associated-image-card" key={image.id}><img src={image.url} alt={`Imagen de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteImage(image.id)} aria-label={`Eliminar imagen ${image.url}`} title="Eliminar imagen">×</button><a href={image.url} target="_blank" rel="noreferrer">{image.url}</a></div>)}</div></div> : null}
+    {word ? <div className="audio-generator"><strong>Sonido de la palabra</strong>{audios.length ? audios.map((audio) => <div className="audio-record" key={audio.id}><audio controls src={audio.url} aria-label={`Pronunciación de ${term}`} /><small>{audio.accent ?? "US"} · {audio.provider ?? "manual"}</small></div>) : <span className="audio-missing">No hay sonido guardado.</span>}<div className="audio-generator-controls"><select value={audioAccent} onChange={(event) => setAudioAccent(event.target.value as "US" | "UK")} aria-label="Acento"><option value="US">Voz femenina US</option><option value="UK">Voz UK</option></select><button className="secondary-button" type="button" onClick={() => void generateAudio()} disabled={isGeneratingAudio}>{isGeneratingAudio ? "Generando..." : audios.length ? "Generar reemplazo" : "Generar sonido"}</button></div></div> : null}
     <label>Agregar enlace de imagen<input type="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." /></label>
     <div className="drop-zone compact-drop" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
       <input id={`image-${word?.id ?? "new"}`} type="file" accept="image/*" onChange={onFileChange} />

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/auth-context";
 
 const apiUrl = import.meta.env.VITE_API_URL;
+type PixabayImage = { id: number; previewUrl: string; url: string; pageUrl: string; tags: string; user: string };
 
 export function AdminPage() {
   const { apiUser, isLoading, isSyncingUser, session } = useAuth();
@@ -18,6 +19,10 @@ export function AdminPage() {
   const [mediaType, setMediaType] = useState("image");
   const [mediaUrl, setMediaUrl] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [pixabayImages, setPixabayImages] = useState<PixabayImage[]>([]);
+  const [selectedPixabayImages, setSelectedPixabayImages] = useState<PixabayImage[]>([]);
+  const [pixabayPage, setPixabayPage] = useState(1);
+  const [isSearchingPixabay, setIsSearchingPixabay] = useState(false);
 
   useEffect(() => {
     if (!session || apiUser?.role !== "ADMIN") return;
@@ -64,7 +69,17 @@ export function AdminPage() {
     const response = await fetch(`${apiUrl}/admin/collections/${selectedCollectionId}/words`, {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ term, translationEs, level, isPublished: false }),
+      body: JSON.stringify({
+        term,
+        translationEs,
+        level,
+        isPublished: false,
+        images: selectedPixabayImages.map((image) => ({
+          url: image.url,
+          attribution: `Pixabay: ${image.user}`,
+          metadata: { id: image.id, pageUrl: image.pageUrl, tags: image.tags },
+        })),
+      }),
     });
     if (!response.ok) {
       setMessage("No se pudo crear o asociar la palabra.");
@@ -74,7 +89,37 @@ export function AdminPage() {
     setWords((current) => [...current, body.word]);
     setTerm("");
     setTranslationEs("");
+    setPixabayImages([]);
+    setSelectedPixabayImages([]);
+    setPixabayPage(1);
     setMessage("Palabra añadida.");
+  };
+
+  const searchPixabay = async (page = 1) => {
+    if (!session || !term.trim()) return;
+    setIsSearchingPixabay(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`${apiUrl}/admin/pixabay/images?q=${encodeURIComponent(term.trim())}&page=${page}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const body = await response.json() as { images?: PixabayImage[]; message?: string };
+      if (!response.ok) throw new Error(body.message ?? "No se pudieron buscar imágenes.");
+      setPixabayImages(body.images ?? []);
+      setPixabayPage(page);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudieron buscar imágenes.");
+    } finally {
+      setIsSearchingPixabay(false);
+    }
+  };
+
+  const selectPixabayImage = (image: PixabayImage) => {
+    setSelectedPixabayImages((current) => current.some((selected) => selected.id === image.id) || current.length >= 4 ? current : [...current, image]);
+    setPixabayImages((current) => current.filter((option) => option.id !== image.id));
+  };
+
+  const removeSelectedPixabayImage = (image: PixabayImage) => {
+    setSelectedPixabayImages((current) => current.filter((selected) => selected.id !== image.id));
+    setPixabayImages((current) => current.some((option) => option.id === image.id) ? current : [image, ...current].slice(0, 4));
   };
 
   const togglePublication = async (kind: "collection" | "word", id: string, isPublished: boolean) => {
@@ -123,9 +168,14 @@ export function AdminPage() {
         {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
       </select>
       {selectedCollectionId ? <form className="admin-form" onSubmit={(event) => void createWord(event)}>
-        <input required placeholder="Palabra en inglés" value={term} onChange={(event) => setTerm(event.target.value)} />
+        <div className="word-search-input"><input required placeholder="Palabra en inglés" value={term} onChange={(event) => setTerm(event.target.value)} /><button type="button" aria-label="Buscar imágenes en Pixabay" onClick={() => void searchPixabay()} disabled={isSearchingPixabay || !term.trim()}>⌕</button></div>
         <input required placeholder="Traducción al español" value={translationEs} onChange={(event) => setTranslationEs(event.target.value)} />
         <select className="admin-select" value={level} onChange={(event) => setLevel(event.target.value)}><option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option></select>
+        {(pixabayImages.length || selectedPixabayImages.length) ? <div className="pixabay-picker">
+          <div className="pixabay-row pixabay-selected-row">{selectedPixabayImages.map((image) => <button key={image.id} type="button" className="pixabay-image-button selected" onClick={() => removeSelectedPixabayImage(image)} title="Quitar imagen"><img src={image.previewUrl} alt={image.tags} /></button>)}</div>
+          <div className="pixabay-row pixabay-options-row"><button type="button" className="pixabay-arrow" onClick={() => void searchPixabay(Math.max(1, pixabayPage - 1))} disabled={isSearchingPixabay || pixabayPage === 1} aria-label="Imágenes anteriores">←</button>{pixabayImages.map((image) => <button key={image.id} type="button" className="pixabay-image-button" onClick={() => selectPixabayImage(image)} title={`Seleccionar imagen de ${image.user}`}><img src={image.previewUrl} alt={image.tags} /></button>)}<button type="button" className="pixabay-arrow" onClick={() => void searchPixabay(pixabayPage + 1)} disabled={isSearchingPixabay || pixabayImages.length === 0} aria-label="Más imágenes">→</button></div>
+          <small>Imágenes de Pixabay · seleccionadas: {selectedPixabayImages.length}/4</small>
+        </div> : null}
         <button className="primary-button" type="submit">Añadir palabra</button>
       </form> : null}
       <ul className="admin-list">{words.map(({ word }) => <li key={word.id}><strong>{word.term}</strong><span>{word.translationEs} · {word.level} · {word.isPublished ? "Publicada" : "Borrador"} <button className="inline-action" onClick={() => void togglePublication("word", word.id, word.isPublished)}>{word.isPublished ? "Ocultar" : "Publicar"}</button><button className="inline-action" onClick={() => setSelectedWordId(word.id)}>Multimedia</button></span></li>)}</ul>
