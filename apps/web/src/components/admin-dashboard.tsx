@@ -22,6 +22,7 @@ async function readBody<T>(response: Response): Promise<T> {
 }
 
 type BulkLine = { line: number; raw: string; term: string; translationEs: string; status: "valid" | "invalid" | "warning" | "empty"; message: string };
+type MissingMediaPreview = { wordId: string; term: string; images: Array<{ url: string; attribution: string; metadata: Record<string, unknown> }>; audio: { url: string; provider: string; voice: string; accent: string; metadata: Record<string, unknown> } | null };
 
 function parseBulkLines(value: string): BulkLine[] {
   const seen = new Set<string>();
@@ -74,6 +75,7 @@ export function AdminDashboard() {
   const [quickPixabayImages, setQuickPixabayImages] = useState<PixabayImage[]>([]);
   const [wordFilter, setWordFilter] = useState<"all" | "translation" | "images" | "audio">("all");
   const [isFillingImages, setIsFillingImages] = useState<string | null>(null);
+  const [missingMedia, setMissingMedia] = useState<Record<string, MissingMediaPreview[]>>({});
 
   const headers = () => ({
     Authorization: `Bearer ${session?.access_token ?? ""}`,
@@ -342,11 +344,21 @@ export function AdminDashboard() {
     if (!session) return;
     setIsFillingImages(collectionId);
     try {
-      const result = await readBody<{ words: EditableWord[]; filled: number }>(await fetch(`${apiUrl}/admin/collections/${collectionId}/images/fill-missing`, { method: "POST", headers: headers() }));
-      setWordsByCollection((current) => ({ ...current, [collectionId]: (current[collectionId] ?? []).map((word) => result.words.find((updated) => updated.id === word.id) ?? word) }));
-      setMessage(`${result.filled} palabras recibieron imágenes.`);
+      const result = await readBody<{ previews: MissingMediaPreview[] }>(await fetch(`${apiUrl}/admin/collections/${collectionId}/images/fill-missing`, { method: "POST", headers: headers() }));
+      setMissingMedia((current) => ({ ...current, [collectionId]: result.previews }));
+      setMessage(`${result.previews.length} palabras están listas para revisar.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "No se pudieron completar las imágenes."); }
     finally { setIsFillingImages(null); }
+  };
+  const confirmMissingMedia = async (collectionId: string) => {
+    if (!session) return;
+    const previews = missingMedia[collectionId] ?? [];
+    try {
+      await readBody(await fetch(`${apiUrl}/admin/collections/${collectionId}/images/fill-missing/confirm`, { method: "POST", headers: { ...headers(), "Content-Type": "application/json" }, body: JSON.stringify({ items: previews }) }));
+      setMissingMedia((current) => ({ ...current, [collectionId]: [] }));
+      setWordsByCollection((current) => { const next = { ...current }; delete next[collectionId]; return next; });
+      setMessage("Imágenes y pronunciaciones guardadas.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "No se pudo confirmar el contenido."); }
   };
   const bulkLinePreview = parseBulkLines(bulkTerms);
   const validBulkLines = bulkLinePreview.filter((line) => line.status === "valid");
@@ -455,7 +467,8 @@ export function AdminDashboard() {
               </div>
               {expanded[collection.id] ? (
                 <div className="nested-words">
-                  <div className="collection-maintenance"><button className="secondary-button" type="button" onClick={() => void fillMissingImages(collection.id)} disabled={isFillingImages === collection.id}>{isFillingImages === collection.id ? "Buscando imágenes..." : "Completar imágenes faltantes"}</button></div>
+                  <div className="collection-maintenance"><button className="secondary-button" type="button" onClick={() => void fillMissingImages(collection.id)} disabled={isFillingImages === collection.id}>{isFillingImages === collection.id ? "Preparando vista previa..." : "Previsualizar faltantes"}</button>{missingMedia[collection.id]?.length ? <button className="primary-button" type="button" onClick={() => void confirmMissingMedia(collection.id)}>Confirmar y guardar</button> : null}</div>
+                  {missingMedia[collection.id]?.length ? <div className="missing-media-preview"><strong>Vista previa, todavía no guardada</strong>{missingMedia[collection.id].map((item) => <div className="missing-media-card" key={item.wordId}><div><b>{item.term}</b><small>{item.images.length ? `${item.images.length} imágenes propuestas` : "Sin imágenes encontradas"}</small></div><div className="missing-media-images">{item.images.map((image) => <img key={image.url} src={image.url} alt={`Propuesta para ${item.term}`} />)}</div>{item.audio ? <audio controls src={item.audio.url} aria-label={`Pronunciación de ${item.term}`} /> : <small>Pronunciación no disponible</small>}</div>)}</div> : null}
                   {(wordsByCollection[collection.id] ?? []).filter((word) => wordFilter === "all" || (wordFilter === "translation" && !word.translationEs.trim()) || (wordFilter === "images" && !word.images?.length) || (wordFilter === "audio" && !word.audios?.length)).map((word) => (
                     <div className="word-item" key={word.id}>
                       <button
