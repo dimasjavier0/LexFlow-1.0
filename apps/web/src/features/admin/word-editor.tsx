@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
-import { Alert, Button, Field, IconButton, Input, Select } from "../../components/ui";
+import { Alert, Button, ConfirmButton, Field, IconButton, Input, Select } from "../../components/ui";
 import type { Session } from "@supabase/supabase-js";
 import { useAuth } from "../../contexts/auth-context";
 import { errorMessage, useAsyncAction } from "../../hooks/use-async-action";
 import {
-  addWordVideo,
+  addWordMedia,
   createWord,
   deleteWordAudio,
   deleteWordImage,
@@ -28,6 +28,8 @@ type WordEditorProps = {
   onSaved: (word: AdminWord, collectionId: string) => void;
   /** Called when media is deleted or generated in place, before the form is saved. */
   onMediaChange?: (word: AdminWord) => void;
+  /** Removes the word from the collection it is being edited in; shows the action when provided. */
+  onRemove?: () => Promise<void>;
   onCancel: () => void;
   className?: string;
 };
@@ -45,7 +47,7 @@ function RemoveButton({ label, onClick }: { label: string; onClick: () => void }
   return <IconButton label={label} tone="plain" className="absolute top-1.5 right-1.5 size-6 bg-ink/80 text-xs text-white hover:bg-danger" onClick={onClick}>✕</IconButton>;
 }
 
-export function WordEditor({ word, collections, initialCollectionId = "", onSaved, onMediaChange, onCancel, className }: WordEditorProps) {
+export function WordEditor({ word, collections, initialCollectionId = "", onSaved, onMediaChange, onRemove, onCancel, className }: WordEditorProps) {
   const { session } = useAuth();
   // Set once the word exists on the server, so a retry after a failed upload updates instead of re-creating.
   const [persisted, setPersisted] = useState(word);
@@ -59,6 +61,8 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [isRemoving, setIsRemoving] = useState(false);
   const [audioAccent, setAudioAccent] = useState<"US" | "UK">("US");
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -137,10 +141,16 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
         setImageFile(null);
       }
       if (videoUrl.trim()) {
-        const video = await addWordVideo(session, current.id, videoUrl.trim());
+        const video = await addWordMedia(session, current.id, "video", videoUrl.trim());
         current = { ...current, videos: [...current.videos, video] };
         setPersisted(current);
         setVideoUrl("");
+      }
+      if (audioUrl.trim()) {
+        const audio = await addWordMedia(session, current.id, "audio", audioUrl.trim());
+        current = { ...current, audios: [...current.audios, audio] };
+        setPersisted(current);
+        setAudioUrl("");
       }
       result = current;
     }, "No se pudo guardar la palabra.");
@@ -244,6 +254,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
             </div>
           </>
         ) : <p className="m-0 text-xs text-muted">Podrás generar la pronunciación después de guardar la palabra.</p>}
+        <Input type="url" aria-label="Enlace de audio" placeholder="…o pega el enlace de un audio (https://...)" value={audioUrl} onChange={(event) => setAudioUrl(event.target.value)} />
       </Section>
 
       <Section title="Videos">
@@ -270,7 +281,21 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
 
       {mediaError ? <Alert>{mediaError}</Alert> : null}
       {save.error ? <Alert>{save.error}</Alert> : null}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {onRemove ? (
+          <span className="mr-auto">
+            <ConfirmButton
+              confirmLabel="Sí, quitar palabra"
+              isLoading={isRemoving}
+              onConfirm={() => {
+                setIsRemoving(true);
+                void onRemove().finally(() => setIsRemoving(false));
+              }}
+            >
+              Quitar de la colección
+            </ConfirmButton>
+          </span>
+        ) : null}
         <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
         <Button type="submit" isLoading={save.isPending} loadingLabel="Guardando...">Guardar palabra</Button>
       </div>

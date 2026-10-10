@@ -1,6 +1,7 @@
 export { Alert, type AlertTone } from "./alert";
 export { Badge } from "./badge";
 export { Button, buttonClasses } from "./button";
+export { ConfirmButton } from "./confirm-button";
 export { EmptyState } from "./empty-state";
 export { Eyebrow } from "./eyebrow";
 export { Field, Input, Select, Textarea } from "./field";

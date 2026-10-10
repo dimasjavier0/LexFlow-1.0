@@ -148,12 +148,14 @@ export async function uploadWordImage(session: Session, wordId: string, file: Fi
   return body.image;
 }
 
-export async function addWordVideo(session: Session, wordId: string, url: string): Promise<{ id: string; url: string }> {
-  const body = await apiRequest<{ resource: { id: string; url: string } }>(`/admin/words/${wordId}/media`, {
+/** Attaches an external video or audio to a word by URL. */
+export async function addWordMedia(session: Session, wordId: string, type: "video" | "audio", url: string): Promise<AdminAudio> {
+  const body = await apiRequest<{ resource: AdminAudio }>(`/admin/words/${wordId}/media`, {
     method: "POST",
     session,
-    body: { type: "video", url },
-    errorMessage: "La palabra se guardó, pero el video no pudo asociarse.",
+    body: { type, url },
+    errorMessage: `La palabra se guardó, pero el ${type === "video" ? "video" : "audio"} no pudo asociarse.`,
+    statusMessages: { 400: `La palabra se guardó, pero la URL del ${type === "video" ? "video" : "audio"} no es válida.` },
   });
   return body.resource;
 }
@@ -189,4 +191,14 @@ export async function setWordPublication(session: Session, wordId: string, isPub
 /** Publishes or unpublishes every word of a collection at once. */
 export async function setCollectionWordsPublication(session: Session, collectionId: string, isPublished: boolean): Promise<void> {
   await apiRequest(`/admin/collections/${collectionId}/words/publication`, { method: "PATCH", session, body: { isPublished }, errorMessage: "No se pudieron publicar las palabras." });
+}
+
+/** Deletes a collection, along with any word that belonged only to it. */
+export async function deleteCollection(session: Session, collectionId: string): Promise<void> {
+  await apiRequest(`/admin/collections/${collectionId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar la colección." });
+}
+
+/** Removes a word from a collection; the word itself is deleted if no other collection uses it. */
+export async function removeWordFromCollection(session: Session, collectionId: string, wordId: string): Promise<void> {
+  await apiRequest(`/admin/collections/${collectionId}/words/${wordId}`, { method: "DELETE", session, errorMessage: "No se pudo quitar la palabra." });
 }

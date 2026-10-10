@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { Alert, Button, Field, Input, Modal, Textarea } from "../../components/ui";
+import { Alert, Button, ConfirmButton, Field, Input, Modal, Textarea } from "../../components/ui";
 import { useAsyncAction } from "../../hooks/use-async-action";
-import { createCollection, updateCollection, type AdminCollection } from "../../lib/admin-api";
+import { createCollection, deleteCollection, updateCollection, type AdminCollection } from "../../lib/admin-api";
 import { slugify } from "../../lib/slug";
 import { ImagePicker, type PickedImage } from "./image-picker";
 import type { AdminLibrary } from "./use-admin-library";
@@ -21,6 +21,7 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
   const [description, setDescription] = useState(collection?.description ?? "");
   const [cover, setCover] = useState<PickedImage[]>(collection?.imageUrl ? [{ url: collection.imageUrl, previewUrl: collection.imageUrl, source: "manual" }] : []);
   const save = useAsyncAction();
+  const remove = useAsyncAction();
   const isEditing = collection !== undefined;
   const slug = customSlug ?? slugify(name);
 
@@ -35,6 +36,16 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
       await library.reloadCollections();
     }, "No se pudo guardar la colección.");
     if (saved) onSaved(isEditing ? "Colección actualizada." : "Colección creada.");
+  };
+
+  const removeCollection = async () => {
+    const { session } = library;
+    if (!session || !collection) return;
+    const removed = await remove.run(async () => {
+      await deleteCollection(session, collection.id);
+      await library.reloadCollections();
+    }, "No se pudo eliminar la colección.");
+    if (removed) onSaved(`“${collection.name}” eliminada.`);
   };
 
   return (
@@ -53,7 +64,13 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
         </Field>
         <ImagePicker value={cover} onChange={setCover} defaultQuery={name} max={1} />
         {save.error ? <Alert>{save.error}</Alert> : null}
-        <div className="flex justify-end gap-2">
+        {remove.error ? <Alert>{remove.error}</Alert> : null}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {isEditing ? (
+            <span className="mr-auto" title="También se eliminan las palabras que no estén en otra colección">
+              <ConfirmButton confirmLabel="Sí, eliminar colección y sus palabras" isLoading={remove.isPending} onConfirm={() => void removeCollection()}>Eliminar colección</ConfirmButton>
+            </span>
+          ) : null}
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button type="submit" isLoading={save.isPending} loadingLabel="Guardando...">{isEditing ? "Guardar cambios" : "Crear colección"}</Button>
         </div>

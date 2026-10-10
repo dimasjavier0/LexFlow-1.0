@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AlertTone } from "../../components/ui";
 import { Alert, Button, EmptyState, Spinner, Switch } from "../../components/ui";
 import { errorMessage } from "../../hooks/use-async-action";
-import { setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord } from "../../lib/admin-api";
+import { removeWordFromCollection, setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord } from "../../lib/admin-api";
 import { MissingMediaPreview } from "./missing-media-preview";
 import { QuickWordForm } from "./quick-word-form";
 import type { AdminLibrary } from "./use-admin-library";
@@ -75,6 +75,19 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
       library.upsertWords(collection.id, [{ ...word, isPublished }]);
     } catch (error) {
       notify(errorMessage(error, "No se pudo cambiar el estado de la palabra."), "error");
+    }
+  };
+
+  const removeWord = async (word: AdminWord) => {
+    if (!session) return;
+    try {
+      await removeWordFromCollection(session, collection.id, word.id);
+      onEditWord(null);
+      library.removeWord(collection.id, word.id);
+      notify(`“${word.term}” quitada de la colección.`);
+      void library.reloadCollections();
+    } catch (error) {
+      notify(errorMessage(error, "No se pudo quitar la palabra."), "error");
     }
   };
 
@@ -152,6 +165,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
                           initialCollectionId={collection.id}
                           className="border-t border-line p-3.5"
                           onMediaChange={(changed) => library.upsertWords(collection.id, [changed])}
+                          onRemove={() => removeWord(word)}
                           onCancel={() => onEditWord(null)}
                           onSaved={(saved) => {
                             library.upsertWords(collection.id, [saved]);

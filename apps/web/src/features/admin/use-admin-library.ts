@@ -53,11 +53,18 @@ export function useAdminLibrary() {
     });
   }, []);
 
+  const removeWord = useCallback((collectionId: string, wordId: string) => {
+    setWordsByCollection((previous) => {
+      const existing = previous[collectionId];
+      return existing ? { ...previous, [collectionId]: existing.filter((word) => word.id !== wordId) } : previous;
+    });
+  }, []);
+
   const patchCollection = useCallback((collectionId: string, patch: Partial<AdminCollection>) => {
     setCollections((previous) => previous?.map((collection) => (collection.id === collectionId ? { ...collection, ...patch } : collection)) ?? previous);
   }, []);
 
-  return { session, collections, loadError, wordsByCollection, reloadCollections, loadWords, upsertWords, patchCollection };
+  return { session, collections, loadError, wordsByCollection, reloadCollections, loadWords, upsertWords, removeWord, patchCollection };
 }
 
 export type AdminLibrary = ReturnType<typeof useAdminLibrary>;
