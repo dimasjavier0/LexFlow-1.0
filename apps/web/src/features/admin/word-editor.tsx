@@ -1,134 +1,279 @@
-import { useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { Alert, Button, Field, IconButton, Input, Select } from "../../components/ui";
+import type { Session } from "@supabase/supabase-js";
 import { useAuth } from "../../contexts/auth-context";
-import type { AdminWord } from "../../lib/admin-api";
+import { errorMessage, useAsyncAction } from "../../hooks/use-async-action";
+import {
+  addWordVideo,
+  createWord,
+  deleteWordAudio,
+  deleteWordImage,
+  deleteWordVideo,
+  generateWordAudio,
+  updateWord,
+  uploadWordImage,
+  type AdminWord,
+} from "../../lib/admin-api";
+import { cn } from "../../lib/cn";
+import { CEFR_LEVELS } from "../../lib/levels";
+import { ImagePicker, type PickedImage } from "./image-picker";
 
-const apiUrl = import.meta.env.VITE_API_URL;
-type CollectionOption = { id: string; name: string };
-export type EditableWord = AdminWord;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 type WordEditorProps = {
-  word?: EditableWord;
-  collections: CollectionOption[];
+  /** Word being edited; omit to create a new one. */
+  word?: AdminWord;
+  collections: Array<{ id: string; name: string }>;
   initialCollectionId?: string;
-  onSaved: (word: EditableWord, collectionId: string) => void;
+  onSaved: (word: AdminWord, collectionId: string) => void;
+  /** Called when media is deleted or generated in place, before the form is saved. */
+  onMediaChange?: (word: AdminWord) => void;
   onCancel: () => void;
+  className?: string;
 };
 
-export function WordEditor({ word, collections, initialCollectionId = "", onSaved, onCancel }: WordEditorProps) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="m-0 grid min-w-0 gap-3 rounded-xl border border-line p-3.5">
+      <legend className="px-1.5 text-xs font-extrabold text-teal-dark">{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return <IconButton label={label} tone="plain" className="absolute top-1.5 right-1.5 size-6 bg-ink/80 text-xs text-white hover:bg-danger" onClick={onClick}>✕</IconButton>;
+}
+
+export function WordEditor({ word, collections, initialCollectionId = "", onSaved, onMediaChange, onCancel, className }: WordEditorProps) {
   const { session } = useAuth();
+  // Set once the word exists on the server, so a retry after a failed upload updates instead of re-creating.
+  const [persisted, setPersisted] = useState(word);
+  const persistedRef = useRef(persisted);
+  persistedRef.current = persisted;
   const [term, setTerm] = useState(word?.term ?? "");
   const [translation, setTranslation] = useState(word?.translationEs ?? "");
-  const [level, setLevel] = useState(word?.level ?? "A1");
+  const [level, setLevel] = useState(word?.level ?? CEFR_LEVELS[0]);
   const [collectionId, setCollectionId] = useState(initialCollectionId);
-  const [imageUrl, setImageUrl] = useState(word?.images?.[0]?.url ?? "");
-  const [associatedImages, setAssociatedImages] = useState(word?.images ?? []);
-  const [videoUrl, setVideoUrl] = useState("");
-  const [associatedVideos, setAssociatedVideos] = useState(word?.videos ?? []);
+  const [newImages, setNewImages] = useState<PickedImage[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [audios, setAudios] = useState(word?.audios ?? []);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
   const [audioAccent, setAudioAccent] = useState<"US" | "UK">("US");
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const save = useAsyncAction();
+
+  useEffect(() => {
+    if (!imageFile) {
+      setFilePreview(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setFilePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
+  /**
+   * Runs an immediate media request on the saved word and applies its result to
+   * the latest copy of the word, reporting failures inline.
+   */
+  const mutateMedia = async <T,>(request: (session: Session) => Promise<T>, apply: (current: AdminWord, result: T) => AdminWord, fallback: string) => {
+    if (!session) return;
+    setMediaError(null);
+    try {
+      const result = await request(session);
+      const current = persistedRef.current;
+      if (!current) return;
+      const next = apply(current, result);
+      setPersisted(next);
+      onMediaChange?.(next);
+    } catch (error) {
+      setMediaError(errorMessage(error, fallback));
+    }
+  };
+
+  const generateAudio = async (wordId: string) => {
+    setIsGeneratingAudio(true);
+    await mutateMedia(
+      (current) => generateWordAudio(current, wordId, audioAccent),
+      (current, audio) => ({ ...current, audios: [...current.audios, audio] }),
+      "No se pudo generar el audio.",
+    );
+    setIsGeneratingAudio(false);
+  };
 
   const selectFile = (file: File | undefined) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setErrorMessage("Solo se permiten imágenes."); return; }
-    if (file.size > 10 * 1024 * 1024) { setErrorMessage("La imagen no puede superar 10 MB."); return; }
-    setImageFile(file);
-    setErrorMessage(null);
+    if (!file.type.startsWith("image/")) setMediaError("Solo se permiten imágenes.");
+    else if (file.size > MAX_UPLOAD_BYTES) setMediaError("La imagen no puede superar 10 MB.");
+    else {
+      setImageFile(file);
+      setMediaError(null);
+    }
   };
 
-  const uploadFile = async (wordId: string) => {
-    if (!imageFile || !session) return;
-    const data = new FormData();
-    data.append("image", imageFile);
-    const response = await fetch(`${apiUrl}/admin/words/${wordId}/images`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body: data });
-    if (!response.ok) throw new Error("La palabra se guardó, pero la imagen no pudo subirse.");
-  };
-
-  const saveImageLink = async (wordId: string) => {
-    if (!imageUrl || !session) return;
-    if (word?.images?.some((image) => image.url === imageUrl)) return;
-    const response = await fetch(`${apiUrl}/admin/words/${wordId}/media`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "image", url: imageUrl }) });
-    if (!response.ok) throw new Error("La palabra se guardó, pero el enlace de imagen no pudo guardarse.");
-  };
-
-  const saveVideoLink = async (wordId: string) => {
-    if (!videoUrl || !session) return;
-    const response = await fetch(`${apiUrl}/admin/words/${wordId}/media`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ type: "video", url: videoUrl }) });
-    if (!response.ok) throw new Error("La palabra se guardó, pero el video no pudo asociarse.");
-  };
-
-  const deleteImage = async (imageId: string) => {
-    if (!session) return;
-    setErrorMessage(null);
-    try {
-      const response = await fetch(`${apiUrl}/admin/images/${imageId}`, { method: "DELETE", headers: { Authorization: `Bearer ${session.access_token}` } });
-      if (!response.ok) throw new Error("No se pudo eliminar la imagen.");
-      setAssociatedImages((current) => current.filter((image) => image.id !== imageId));
-      setImageUrl((current) => current === associatedImages.find((image) => image.id === imageId)?.url ? "" : current);
-    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar la imagen."); }
-  };
-
-  const deleteVideo = async (videoId: string) => {
-    if (!session) return;
-    setErrorMessage(null);
-    try {
-      const response = await fetch(`${apiUrl}/admin/videos/${videoId}`, { method: "DELETE", headers: { Authorization: `Bearer ${session.access_token}` } });
-      if (!response.ok) throw new Error("No se pudo eliminar el video.");
-      setAssociatedVideos((current) => current.filter((video) => video.id !== videoId));
-    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el video."); }
-  };
-
-  const generateAudio = async () => {
-    if (!word || !session) return;
-    setIsGeneratingAudio(true);
-    setErrorMessage(null);
-    try {
-      const response = await fetch(`${apiUrl}/admin/words/${word.id}/audio/generate`, { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ accent: audioAccent }) });
-      const body = await response.json() as { audio?: NonNullable<EditableWord["audios"]>[number]; message?: string };
-      if (!response.ok || !body.audio) throw new Error(body.message ?? "No se pudo generar el audio.");
-      setAudios((current) => [...current, body.audio!]);
-    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo generar el audio."); }
-    finally { setIsGeneratingAudio(false); }
+  const onDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    selectFile(event.dataTransfer.files[0]);
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!session || (!word && !collectionId)) { setErrorMessage("Selecciona una colección."); return; }
-    setIsSaving(true); setErrorMessage(null);
-    try {
-      const endpoint = word ? `/admin/words/${word.id}` : `/admin/collections/${collectionId}/words`;
-      const response = await fetch(`${apiUrl}${endpoint}`, { method: word ? "PATCH" : "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ term, translationEs: translation, level, isPublished: word?.isPublished ?? false }) });
-      if (!response.ok) throw new Error("No se pudo guardar la palabra.");
-      const body = await response.json() as { word: EditableWord | { word: EditableWord } };
-      const savedWord = "word" in body.word ? body.word.word : body.word;
-      await uploadFile(savedWord.id);
-      await saveImageLink(savedWord.id);
-      await saveVideoLink(savedWord.id);
-      onSaved(savedWord, collectionId);
-    } catch (error) { setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar la palabra."); }
-    finally { setIsSaving(false); }
+    if (!session) return;
+    let result: AdminWord | undefined;
+    const saved = await save.run(async () => {
+      const fields = { term: term.trim(), translationEs: translation.trim(), level, images: newImages.map(({ previewUrl: _previewUrl, ...image }) => image) };
+      let current = persisted ? await updateWord(session, persisted.id, fields) : await createWord(session, collectionId, fields);
+      setPersisted(current);
+      setNewImages([]);
+      // The word itself is saved; keep the list in sync even if a later upload fails.
+      if (word) onMediaChange?.(current);
+
+      if (imageFile) {
+        const image = await uploadWordImage(session, current.id, imageFile);
+        current = { ...current, images: [...current.images, image] };
+        setPersisted(current);
+        setImageFile(null);
+      }
+      if (videoUrl.trim()) {
+        const video = await addWordVideo(session, current.id, videoUrl.trim());
+        current = { ...current, videos: [...current.videos, video] };
+        setPersisted(current);
+        setVideoUrl("");
+      }
+      result = current;
+    }, "No se pudo guardar la palabra.");
+    if (saved && result) onSaved(result, collectionId);
   };
 
-  const onDrop = (event: DragEvent<HTMLDivElement>) => { event.preventDefault(); selectFile(event.dataTransfer.files[0]); };
-  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => selectFile(event.target.files?.[0]);
+  const images = persisted?.images ?? [];
+  const audios = persisted?.audios ?? [];
+  const videos = persisted?.videos ?? [];
 
-  return <form className="admin-form word-editor" onSubmit={(event) => void submit(event)}>
-    <div className="form-grid"><label>Palabra<input required value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" /></label><label>Traducción<input required value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" /></label><label>Nivel<select value={level} onChange={(event) => setLevel(event.target.value)}>{["A1", "A2", "B1", "B2", "C1", "C2"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
-    {!word ? <label>Colección<select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Selecciona una colección</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label> : null}
-    {associatedImages.length ? <div className="associated-media"><strong>Imágenes asociadas</strong><div className="associated-image-grid">{associatedImages.map((image) => <div className="associated-image-card" key={image.id}><img src={image.url} alt={`Imagen de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteImage(image.id)} aria-label={`Eliminar imagen ${image.url}`} title="Eliminar imagen">×</button><a href={image.url} target="_blank" rel="noreferrer">{image.url}</a></div>)}</div></div> : null}
-    {word ? <div className="audio-generator"><strong>Sonido de la palabra</strong>{audios.length ? audios.map((audio) => <div className="audio-record" key={audio.id}><audio controls src={audio.url} aria-label={`Pronunciación de ${term}`} /><small>{audio.accent ?? "US"} · {audio.provider ?? "manual"}</small></div>) : <span className="audio-missing">No hay sonido guardado.</span>}<div className="audio-generator-controls"><select value={audioAccent} onChange={(event) => setAudioAccent(event.target.value as "US" | "UK")} aria-label="Acento"><option value="US">Voz femenina US</option><option value="UK">Voz UK</option></select><button className="secondary-button" type="button" onClick={() => void generateAudio()} disabled={isGeneratingAudio}>{isGeneratingAudio ? "Generando..." : audios.length ? "Generar reemplazo" : "Generar sonido"}</button></div></div> : null}
-    <label>Agregar enlace de imagen<input type="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." /></label>
-    <div className="drop-zone compact-drop" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-      <input id={`image-${word?.id ?? "new"}`} type="file" accept="image/*" onChange={onFileChange} />
-      {imageFile || imageUrl || word?.images?.[0] ? <img className="editor-image-preview" src={imageFile ? URL.createObjectURL(imageFile) : imageUrl || word?.images?.[0]?.url} alt="Vista previa de la imagen" /> : null}
-      <label htmlFor={`image-${word?.id ?? "new"}`}><strong>{imageFile ? imageFile.name : imageUrl ? "Imagen actual" : "Arrastra una imagen aquí"}</strong><small>o pulsa para seleccionar · máximo 10 MB</small></label>
-    </div>
-    {associatedVideos.length ? <div className="associated-media"><strong>Videos asociados</strong><div className="associated-video-grid">{associatedVideos.map((video) => <div className="associated-video-card" key={video.id}><video controls preload="metadata" src={video.url} aria-label={`Video de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteVideo(video.id)} aria-label={`Eliminar video ${video.url}`} title="Eliminar video">×</button><a href={video.url} target="_blank" rel="noreferrer">{video.url}</a></div>)}</div></div> : null}
-    <label>Agregar enlace de video<input type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="https://..." /></label>
-    {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
-    <div className="editor-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancelar</button><button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : "Guardar palabra"}</button></div>
-  </form>;
+  return (
+    <form className={cn("grid gap-4", className)} onSubmit={(event) => void submit(event)}>
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_6rem]">
+        <Field label="Palabra">
+          <Input required maxLength={100} value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" />
+        </Field>
+        <Field label="Traducción">
+          <Input required maxLength={200} value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" />
+        </Field>
+        <Field label="Nivel">
+          <Select value={level} onChange={(event) => setLevel(event.target.value)}>
+            {CEFR_LEVELS.map((item) => <option key={item}>{item}</option>)}
+          </Select>
+        </Field>
+      </div>
+      {persisted ? null : (
+        <Field label="Colección">
+          <Select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}>
+            <option value="">Selecciona una colección</option>
+            {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+          </Select>
+        </Field>
+      )}
+
+      <Section title="Imágenes">
+        {images.length ? (
+          <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-2.5 p-0">
+            {images.map((image) => (
+              <li key={image.id} className="relative">
+                <a href={image.url} target="_blank" rel="noreferrer" title="Abrir imagen">
+                  <img className="aspect-[5/4] w-full rounded-lg bg-teal-soft object-cover" src={image.url} alt={`Imagen de ${term}`} />
+                </a>
+                <RemoveButton
+                  label="Eliminar imagen"
+                  onClick={() => void mutateMedia(
+                    (current) => deleteWordImage(current, image.id),
+                    (current) => ({ ...current, images: current.images.filter((item) => item.id !== image.id) }),
+                    "No se pudo eliminar la imagen.",
+                  )}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <ImagePicker value={newImages} onChange={setNewImages} defaultQuery={term} />
+        <label onDragOver={(event) => event.preventDefault()} onDrop={onDrop} className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-line bg-paper/60 p-3 text-sm transition-colors hover:border-teal hover:bg-teal-soft/40">
+          <input type="file" accept="image/*" className="sr-only" onChange={(event) => selectFile(event.target.files?.[0])} />
+          {filePreview ? <img className="h-14 w-20 shrink-0 rounded-lg object-cover" src={filePreview} alt="Vista previa de la imagen" /> : <span aria-hidden="true" className="grid h-14 w-20 shrink-0 place-items-center rounded-lg bg-teal-soft text-xl text-teal-dark">↥</span>}
+          <span className="min-w-0 flex-1">
+            <strong className="block truncate">{imageFile ? imageFile.name : "Subir una imagen propia"}</strong>
+            <small className="text-xs text-muted">Arrastra un archivo o pulsa para elegirlo · máximo 10 MB</small>
+          </span>
+          {imageFile ? (
+            <Button variant="ghost" size="sm" onClick={(event) => { event.preventDefault(); setImageFile(null); }}>Quitar</Button>
+          ) : null}
+        </label>
+      </Section>
+
+      <Section title="Sonido">
+        {persisted ? (
+          <>
+            {audios.length ? (
+              <ul className="m-0 grid list-none gap-2 p-0">
+                {audios.map((audio) => (
+                  <li key={audio.id} className="flex flex-wrap items-center gap-2">
+                    <audio className="h-9 min-w-0 flex-1" controls src={audio.url} aria-label={`Pronunciación de ${term}`} />
+                    <small className="text-xs text-muted">{audio.accent ?? "US"} · {audio.provider ?? "manual"}</small>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void mutateMedia(
+                        (current) => deleteWordAudio(current, audio.id),
+                        (current) => ({ ...current, audios: current.audios.filter((item) => item.id !== audio.id) }),
+                        "No se pudo eliminar el sonido.",
+                      )}
+                    >
+                      Eliminar
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="m-0 text-xs text-muted">No hay sonido guardado.</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              <Select className="w-auto" aria-label="Acento" value={audioAccent} onChange={(event) => setAudioAccent(event.target.value as "US" | "UK")}>
+                <option value="US">Voz US</option>
+                <option value="UK">Voz UK</option>
+              </Select>
+              <Button variant="secondary" isLoading={isGeneratingAudio} loadingLabel="Generando..." onClick={() => void generateAudio(persisted.id)}>
+                {audios.length ? "Generar otro sonido" : "Generar sonido"}
+              </Button>
+            </div>
+          </>
+        ) : <p className="m-0 text-xs text-muted">Podrás generar la pronunciación después de guardar la palabra.</p>}
+      </Section>
+
+      <Section title="Videos">
+        {videos.length ? (
+          <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2.5 p-0">
+            {videos.map((video) => (
+              <li key={video.id} className="relative min-w-0">
+                <video className="aspect-video w-full rounded-lg bg-ink" controls preload="metadata" src={video.url} aria-label={`Video de ${term}`} />
+                <a className="mt-1 block truncate text-[0.7rem] text-teal-dark" href={video.url} target="_blank" rel="noreferrer">{video.url}</a>
+                <RemoveButton
+                  label="Eliminar video"
+                  onClick={() => void mutateMedia(
+                    (current) => deleteWordVideo(current, video.id),
+                    (current) => ({ ...current, videos: current.videos.filter((item) => item.id !== video.id) }),
+                    "No se pudo eliminar el video.",
+                  )}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <Input type="url" aria-label="Enlace de video" placeholder="Pega el enlace de un video (https://...)" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} />
+      </Section>
+
+      {mediaError ? <Alert>{mediaError}</Alert> : null}
+      {save.error ? <Alert>{save.error}</Alert> : null}
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" isLoading={save.isPending} loadingLabel="Guardando...">Guardar palabra</Button>
+      </div>
+    </form>
+  );
 }

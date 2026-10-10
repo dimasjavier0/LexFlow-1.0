@@ -116,6 +116,8 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
                           word={word}
                           collections={library.collections ?? []}
                           initialCollectionId={collection.id}
+                          className="border-t border-line p-3.5"
+                          onMediaChange={(changed) => library.upsertWords(collection.id, [changed])}
                           onCancel={() => onEditWord(null)}
                           onSaved={(saved) => {
                             library.upsertWords(collection.id, [saved]);

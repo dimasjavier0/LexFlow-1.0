@@ -120,3 +120,64 @@ export async function searchImages(session: Session, query: string, page: number
   });
   return body.images;
 }
+
+export async function updateWord(
+  session: Session,
+  wordId: string,
+  input: { term: string; translationEs: string; level: string; images?: NewWordImage[] },
+): Promise<AdminWord> {
+  const body = await apiRequest<{ word: AdminWord }>(`/admin/words/${wordId}`, {
+    method: "PATCH",
+    session,
+    body: input,
+    errorMessage: "No se pudo guardar la palabra.",
+    statusMessages: { 400: INVALID_DATA, 409: "Ya existe otra palabra con ese término." },
+  });
+  return body.word;
+}
+
+export async function uploadWordImage(session: Session, wordId: string, file: File): Promise<{ id: string; url: string }> {
+  const data = new FormData();
+  data.append("image", file);
+  const body = await apiRequest<{ image: { id: string; url: string } }>(`/admin/words/${wordId}/images`, {
+    method: "POST",
+    session,
+    body: data,
+    errorMessage: "La palabra se guardó, pero la imagen no pudo subirse.",
+  });
+  return body.image;
+}
+
+export async function addWordVideo(session: Session, wordId: string, url: string): Promise<{ id: string; url: string }> {
+  const body = await apiRequest<{ resource: { id: string; url: string } }>(`/admin/words/${wordId}/media`, {
+    method: "POST",
+    session,
+    body: { type: "video", url },
+    errorMessage: "La palabra se guardó, pero el video no pudo asociarse.",
+  });
+  return body.resource;
+}
+
+export async function deleteWordImage(session: Session, imageId: string): Promise<void> {
+  await apiRequest(`/admin/images/${imageId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar la imagen." });
+}
+
+export async function deleteWordVideo(session: Session, videoId: string): Promise<void> {
+  await apiRequest(`/admin/videos/${videoId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar el video." });
+}
+
+export async function deleteWordAudio(session: Session, audioId: string): Promise<void> {
+  await apiRequest(`/admin/audios/${audioId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar el sonido." });
+}
+
+export async function generateWordAudio(session: Session, wordId: string, accent: "US" | "UK"): Promise<AdminAudio> {
+  // The API explains Piper failures (missing model, binary not found) in Spanish.
+  const body = await apiRequest<{ audio: AdminAudio }>(`/admin/words/${wordId}/audio/generate`, {
+    method: "POST",
+    session,
+    body: { accent },
+    errorMessage: "No se pudo generar el audio.",
+    preferServerMessage: true,
+  });
+  return body.audio;
+}
