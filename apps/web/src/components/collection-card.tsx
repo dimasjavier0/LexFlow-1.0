@@ -1,15 +1,20 @@
 import { Link } from "react-router-dom";
 import type { ApiCollectionSummary } from "../lib/api";
+import type { CefrLevel } from "../lib/levels";
 import { Eyebrow } from "./ui";
 
-type CollectionCardProps = { collection: ApiCollectionSummary };
+type CollectionCardProps = {
+  collection: ApiCollectionSummary;
+  /** Level the learner is browsing; carried into the lesson. */
+  level?: CefrLevel | null;
+};
 
-export function CollectionCard({ collection }: CollectionCardProps) {
+export function CollectionCard({ collection, level = null }: CollectionCardProps) {
   const wordCount = collection._count.words;
 
   return (
     <Link
-      to={`/learn/${collection.slug}`}
+      to={`/learn/${collection.slug}${level ? `?level=${level}` : ""}`}
       className="group grid min-h-56 gap-7 rounded-3xl border border-line bg-surface p-6 text-ink no-underline shadow-card transition duration-200 hover:-translate-y-1 hover:border-teal hover:shadow-lift"
     >
       <div className="flex items-center justify-between">

@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import type { CefrLevel } from "./levels";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -94,13 +95,23 @@ export async function apiRequest<T = void>(path: string, options: RequestOptions
   return payload as T;
 }
 
-export async function getCollections(): Promise<ApiCollectionSummary[]> {
-  const body = await apiRequest<{ collections: ApiCollectionSummary[] }>("/collections", { errorMessage: "No se pudieron cargar las colecciones." });
-  return body.collections;
+function levelQuery(level: CefrLevel | null): string {
+  return level ? `?level=${level}` : "";
 }
 
-export async function getCollection(slug: string): Promise<ApiCollection> {
-  const body = await apiRequest<{ collection: ApiCollection }>(`/collections/${encodeURIComponent(slug)}`, {
+export type CollectionCatalog = {
+  collections: ApiCollectionSummary[];
+  /** Levels that have at least one published word, for the level selector. */
+  levels: CefrLevel[];
+};
+
+/** Published collections, optionally narrowed (and counted) by CEFR level. */
+export async function getCollections(level: CefrLevel | null = null): Promise<CollectionCatalog> {
+  return apiRequest<CollectionCatalog>(`/collections${levelQuery(level)}`, { errorMessage: "No se pudieron cargar las colecciones." });
+}
+
+export async function getCollection(slug: string, level: CefrLevel | null = null): Promise<ApiCollection> {
+  const body = await apiRequest<{ collection: ApiCollection }>(`/collections/${encodeURIComponent(slug)}${levelQuery(level)}`, {
     errorMessage: "No se pudo cargar la colección.",
     statusMessages: { 404: "Esta colección no existe o todavía no está publicada." },
   });

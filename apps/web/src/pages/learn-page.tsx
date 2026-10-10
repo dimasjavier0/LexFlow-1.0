@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CarouselControls, MediaCarousel } from "../components/media-carousel";
 import { StatusPage } from "../components/status-page";
 import { Alert, Badge, Button, buttonClasses, Eyebrow, IconButton } from "../components/ui";
@@ -8,7 +8,7 @@ import { errorMessage, useAsyncAction } from "../hooks/use-async-action";
 import { AppLayout } from "../layouts/app-layout";
 import { getCollection, getProgress, updateProgress, type ApiCollection, type LearningStatus } from "../lib/api";
 import { cn } from "../lib/cn";
-import { LEARNING_STATUS_LABELS } from "../lib/levels";
+import { isCefrLevel, LEARNING_STATUS_LABELS } from "../lib/levels";
 
 const STATUS_ACTIONS: Array<{ status: LearningStatus; icon: string; className: string }> = [
   { status: "WANT_TO_LEARN", icon: "+", className: "bg-sun/25 text-warning" },
@@ -22,6 +22,9 @@ const backLink = <Link className={buttonClasses({ variant: "secondary" })} to="/
 
 export function LearnPage() {
   const { collectionSlug = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const levelParam = searchParams.get("level");
+  const level = isCefrLevel(levelParam) ? levelParam : null;
   const { session } = useAuth();
   const [collection, setCollection] = useState<ApiCollection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export function LearnPage() {
     setCollection(null);
     setLoadError(null);
     showWord(0);
-    getCollection(collectionSlug)
+    getCollection(collectionSlug, level)
       .then((loaded) => {
         if (isCurrent) setCollection(loaded);
       })
@@ -61,7 +64,7 @@ export function LearnPage() {
     return () => {
       isCurrent = false;
     };
-  }, [collectionSlug, reloadKey, showWord]);
+  }, [collectionSlug, level, reloadKey, showWord]);
 
   useEffect(() => {
     if (!session) return;
@@ -97,7 +100,7 @@ export function LearnPage() {
   if (!collection) return <StatusPage isLoading>Cargando colección...</StatusPage>;
 
   const currentWord = collection.words[wordIndex]?.word;
-  if (!currentWord) return <StatusPage action={backLink}>Esta colección aún no tiene palabras publicadas.</StatusPage>;
+  if (!currentWord) return <StatusPage action={backLink}>{level ? `Esta colección no tiene palabras de nivel ${level}.` : "Esta colección aún no tiene palabras publicadas."}</StatusPage>;
 
   const topbar = (
     <header className="flex items-center justify-between gap-4">
@@ -147,7 +150,7 @@ export function LearnPage() {
   return (
     <AppLayout width="narrow" topbar={topbar}>
       <div className="mt-12 mb-7 text-center sm:mt-16">
-        <Eyebrow>{collection.name}</Eyebrow>
+        <Eyebrow>{collection.name}{level ? ` · Nivel ${level}` : ""}</Eyebrow>
         <h1 className="mt-2.5 mb-5 text-[clamp(2.6rem,8vw,4.8rem)] leading-[0.95] font-bold tracking-tighter break-words">{currentWord.term}</h1>
         <div className="mx-auto h-1.5 max-w-64 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Avance en la colección" aria-valuemin={1} aria-valuemax={wordCount} aria-valuenow={wordIndex + 1}>
           <span className="block h-full rounded-full bg-teal transition-[width] duration-200" style={{ width: `${((wordIndex + 1) / wordCount) * 100}%` }} />
