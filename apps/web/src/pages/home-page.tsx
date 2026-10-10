@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CollectionCard, CollectionCardSkeleton } from "../components/collection-card";
+import { WordSearch } from "../components/word-search";
 import { Alert, Button, buttonClasses, EmptyState, Eyebrow, FilterChips } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
 import { errorMessage } from "../hooks/use-async-action";
@@ -104,7 +105,9 @@ export function HomePage() {
         <Eyebrow>Tu ruta de vocabulario</Eyebrow>
         <h1 className="mx-auto mt-3 mb-3.5 max-w-xl text-[clamp(2.5rem,7vw,4.5rem)] leading-[0.98] font-bold tracking-tighter">Aprende una palabra cada vez.</h1>
         <p className="m-0 text-lg text-muted">Descubre vocabulario con imágenes, audio y contexto.</p>
-        {apiUser ? <p className="mt-5 text-xs text-muted">Conectado como {apiUser.email}</p> : null}
+        {apiUser ? <p className="mt-5 text-xs text-muted">Conectado como {apiUser.name ?? apiUser.email}</p> : null}
+        {/* Lessons need a session, so the search is only offered once signed in. */}
+        {session ? <div className="mt-7"><WordSearch /></div> : null}
       </section>
       {dueCount ? (
         <Alert tone="info" className="mb-6" action={<Link className={buttonClasses({ size: "sm", className: "shrink-0" })} to="/review">Repasar ahora</Link>}>

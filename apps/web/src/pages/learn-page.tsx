@@ -29,6 +29,8 @@ export function LearnPage() {
   const [searchParams] = useSearchParams();
   const levelParam = searchParams.get("level");
   const level = isCefrLevel(levelParam) ? levelParam : null;
+  /** Word to open the lesson on, set when arriving from the search. */
+  const startWordId = searchParams.get("word");
   const { session } = useAuth();
   const [collection, setCollection] = useState<ApiCollection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -91,7 +93,13 @@ export function LearnPage() {
   useEffect(() => {
     if (!collection || !savedProgress || knownIds) return;
     setKnownIds(new Set(collection.words.filter(({ word }) => KNOWN_STATUSES.includes(savedProgress[word.id])).map(({ word }) => word.id)));
-  }, [collection, knownIds, savedProgress]);
+    const startIndex = startWordId ? collection.words.findIndex(({ word }) => word.id === startWordId) : -1;
+    if (startIndex >= 0) {
+      // The requested word may be one the learner already knows, so nothing is hidden.
+      setShowAll(true);
+      setWordIndex(startIndex);
+    }
+  }, [collection, knownIds, savedProgress, startWordId]);
 
   const moveWord = useCallback((direction: -1 | 1) => {
     const nextIndex = wordIndex + direction;

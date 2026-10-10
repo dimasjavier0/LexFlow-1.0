@@ -207,3 +207,11 @@ export async function updateProfile(session: Session, input: { name: string | nu
   });
   return body.user;
 }
+
+export type WordSearchResult = { id: string; term: string; level: string; collection: { slug: string; name: string } };
+
+/** Published words whose English term starts with `query`. */
+export async function searchWords(query: string): Promise<WordSearchResult[]> {
+  const body = await apiRequest<{ words: WordSearchResult[] }>(`/words/search?q=${encodeURIComponent(query)}`, { errorMessage: "No se pudo buscar." });
+  return body.words;
+}
