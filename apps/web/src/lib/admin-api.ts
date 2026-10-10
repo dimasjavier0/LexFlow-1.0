@@ -181,3 +181,12 @@ export async function generateWordAudio(session: Session, wordId: string, accent
   });
   return body.audio;
 }
+
+export async function setWordPublication(session: Session, wordId: string, isPublished: boolean): Promise<void> {
+  await apiRequest(`/admin/words/${wordId}/publication`, { method: "PATCH", session, body: { isPublished }, errorMessage: "No se pudo cambiar el estado de la palabra." });
+}
+
+/** Publishes or unpublishes every word of a collection at once. */
+export async function setCollectionWordsPublication(session: Session, collectionId: string, isPublished: boolean): Promise<void> {
+  await apiRequest(`/admin/collections/${collectionId}/words/publication`, { method: "PATCH", session, body: { isPublished }, errorMessage: "No se pudieron publicar las palabras." });
+}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AlertTone } from "../../components/ui";
 import { Alert, Button, EmptyState, Spinner, Switch } from "../../components/ui";
 import { errorMessage } from "../../hooks/use-async-action";
-import { setCollectionPublication, type AdminCollection, type AdminWord } from "../../lib/admin-api";
+import { setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord } from "../../lib/admin-api";
 import { MissingMediaPreview } from "./missing-media-preview";
 import { QuickWordForm } from "./quick-word-form";
 import type { AdminLibrary } from "./use-admin-library";
@@ -43,6 +43,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
   const isLoaded = words !== undefined;
   const [wordsError, setWordsError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublishingWords, setIsPublishingWords] = useState(false);
 
   const fetchWords = useCallback(() => {
     setWordsError(null);
@@ -67,6 +68,31 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
     }
   };
 
+  const publishWord = async (word: AdminWord, isPublished: boolean) => {
+    if (!session) return;
+    try {
+      await setWordPublication(session, word.id, isPublished);
+      library.upsertWords(collection.id, [{ ...word, isPublished }]);
+    } catch (error) {
+      notify(errorMessage(error, "No se pudo cambiar el estado de la palabra."), "error");
+    }
+  };
+
+  const publishAllWords = async () => {
+    if (!session) return;
+    setIsPublishingWords(true);
+    try {
+      await setCollectionWordsPublication(session, collection.id, true);
+      await loadWords(collection.id);
+      notify(`Todas las palabras de “${collection.name}” están publicadas.`);
+    } catch (error) {
+      notify(errorMessage(error, "No se pudieron publicar las palabras."), "error");
+    } finally {
+      setIsPublishingWords(false);
+    }
+  };
+
+  const publishedCount = words?.filter((word) => word.isPublished).length ?? 0;
   const visibleWords = words?.filter((word) => matchesFilter(word, wordFilter)) ?? [];
   const wordCount = collection._count.words;
   const panelId = `collection-panel-${collection.id}`;
@@ -104,13 +130,21 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
           {!isLoaded && !wordsError ? <p className="m-0 flex items-center justify-center gap-2 py-6 text-sm text-muted"><Spinner /> Cargando palabras...</p> : null}
           {isLoaded ? (
             <>
+              {words.length ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="m-0 text-xs text-muted">
+                    <strong className={publishedCount === 0 ? "text-warning" : "text-teal-dark"}>{publishedCount} de {words.length}</strong> publicadas. Los estudiantes solo ven las palabras publicadas.
+                  </p>
+                  {publishedCount < words.length ? <Button size="sm" isLoading={isPublishingWords} loadingLabel="Publicando..." onClick={() => void publishAllWords()}>Publicar todas</Button> : null}
+                </div>
+              ) : null}
               {words.length ? <MissingMediaPreview collectionId={collection.id} library={library} notify={notify} /> : null}
               {words.length === 0 ? <EmptyState title="Esta colección todavía no tiene palabras" description="Añade la primera con el formulario de abajo o usa la lista rápida." /> : null}
               {words.length > 0 && visibleWords.length === 0 ? <EmptyState title="Ninguna palabra coincide con el filtro" description="Cambia el filtro para ver el resto de la colección." /> : null}
               {visibleWords.length ? (
                 <ul className="m-0 grid list-none gap-1.5 p-0">
                   {visibleWords.map((word) => (
-                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)}>
+                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} onPublish={(isPublished) => publishWord(word, isPublished)}>
                       {editingWordId === word.id ? (
                         <WordEditor
                           word={word}

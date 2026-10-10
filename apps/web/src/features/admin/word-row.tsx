@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Badge } from "../../components/ui";
+import { useState, type ReactNode } from "react";
+import { Badge, Switch } from "../../components/ui";
 import type { AdminWord } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
 
@@ -7,12 +7,21 @@ type WordRowProps = {
   word: AdminWord;
   isEditing: boolean;
   onToggleEdit: () => void;
+  /** Persists the new publication state; rejections are handled by the caller. */
+  onPublish: (isPublished: boolean) => Promise<void>;
   /** Inline editor, rendered under the row while editing. */
   children?: ReactNode;
 };
 
-export function WordRow({ word, isEditing, onToggleEdit, children }: WordRowProps) {
+export function WordRow({ word, isEditing, onToggleEdit, onPublish, children }: WordRowProps) {
   const [cover, ...otherImages] = word.images;
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const publish = async (isPublished: boolean) => {
+    setIsPublishing(true);
+    await onPublish(isPublished);
+    setIsPublishing(false);
+  };
 
   return (
     <li className={cn("overflow-hidden rounded-xl border bg-surface", isEditing ? "border-teal" : "border-line")}>
@@ -32,7 +41,14 @@ export function WordRow({ word, isEditing, onToggleEdit, children }: WordRowProp
           {otherImages.length ? <Badge tone="neutral">+{otherImages.length} img</Badge> : null}
           {word.images.length ? null : <Badge tone="warning">Sin imágenes</Badge>}
           {word.audios.length ? null : <Badge tone="warning">Sin sonido</Badge>}
-          <Badge tone={word.isPublished ? "teal" : "neutral"}>{word.isPublished ? "Publicada" : "Borrador"}</Badge>
+          <Switch
+            checked={word.isPublished}
+            disabled={isPublishing}
+            onChange={(isPublished) => void publish(isPublished)}
+            label={`${word.isPublished ? "Despublicar" : "Publicar"} ${word.term}`}
+            onText="Publicada"
+            offText="Borrador"
+          />
         </div>
       </div>
       {children}
