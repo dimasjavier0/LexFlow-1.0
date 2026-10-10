@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { PixabayPicker, type PixabayImage } from "../../components/pixabay-picker";
 import { Alert, Button, Field, Input, Modal, Textarea } from "../../components/ui";
 import { useAsyncAction } from "../../hooks/use-async-action";
 import { createCollection, updateCollection, type AdminCollection } from "../../lib/admin-api";
 import { slugify } from "../../lib/slug";
+import { ImagePicker, type PickedImage } from "./image-picker";
 import type { AdminLibrary } from "./use-admin-library";
 
 type CollectionFormModalProps = {
@@ -19,8 +19,7 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
   // Until the admin types a slug of their own, it follows the name.
   const [customSlug, setCustomSlug] = useState<string | null>(null);
   const [description, setDescription] = useState(collection?.description ?? "");
-  const [imageUrl, setImageUrl] = useState(collection?.imageUrl ?? "");
-  const [pixabayImages, setPixabayImages] = useState<PixabayImage[]>([]);
+  const [cover, setCover] = useState<PickedImage[]>(collection?.imageUrl ? [{ url: collection.imageUrl, previewUrl: collection.imageUrl, source: "manual" }] : []);
   const save = useAsyncAction();
   const isEditing = collection !== undefined;
   const slug = customSlug ?? slugify(name);
@@ -29,8 +28,7 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
     event.preventDefault();
     const { session } = library;
     if (!session) return;
-    const cover = imageUrl.trim() || pixabayImages[0]?.url || null;
-    const details = { name: name.trim(), description: description.trim() || null, imageUrl: cover };
+    const details = { name: name.trim(), description: description.trim() || null, imageUrl: cover[0]?.url ?? null };
     const saved = await save.run(async () => {
       if (collection) await updateCollection(session, collection.id, details);
       else await createCollection(session, { ...details, slug });
@@ -53,11 +51,7 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
         <Field label="Descripción" hint="Opcional. Se muestra en la tarjeta de la colección.">
           <Textarea rows={2} maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Vocabulario básico de colores" />
         </Field>
-        <Field label="Imagen de portada">
-          <Input type="text" inputMode="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." />
-        </Field>
-        {imageUrl ? <img className="max-h-44 w-full rounded-xl bg-teal-soft object-cover" src={imageUrl} alt="Vista previa de la colección" /> : null}
-        <PixabayPicker imageUrl={imageUrl} onImageUrlChange={setImageUrl} selectedImages={pixabayImages} onSelectedImagesChange={setPixabayImages} />
+        <ImagePicker value={cover} onChange={setCover} defaultQuery={name} max={1} />
         {save.error ? <Alert>{save.error}</Alert> : null}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>

@@ -24,7 +24,9 @@ export type AdminWord = {
   videos: Array<{ id: string; url: string }>;
 };
 
-export type NewWordImage = { url: string; attribution?: string; metadata?: Record<string, unknown> };
+export type NewWordImage = { url: string; source: "pixabay" | "manual"; attribution?: string; metadata?: Record<string, unknown> };
+
+export type PixabayImage = { id: number; previewUrl: string; url: string; pageUrl: string; tags: string; user: string };
 
 export type MissingMediaPreview = {
   wordId: string;
@@ -107,4 +109,14 @@ export async function previewMissingMedia(session: Session, collectionId: string
 
 export async function confirmMissingMedia(session: Session, collectionId: string, items: MissingMediaPreview[]): Promise<void> {
   await apiRequest(`/admin/collections/${collectionId}/images/fill-missing/confirm`, { method: "POST", session, body: { items }, errorMessage: "No se pudo guardar el contenido propuesto." });
+}
+
+export async function searchImages(session: Session, query: string, page: number): Promise<PixabayImage[]> {
+  const params = new URLSearchParams({ q: query, page: String(page) });
+  const body = await apiRequest<{ images: PixabayImage[] }>(`/admin/pixabay/images?${params.toString()}`, {
+    session,
+    errorMessage: "No se pudieron buscar imágenes.",
+    statusMessages: { 502: "Pixabay no respondió. Inténtalo de nuevo.", 503: "La búsqueda de Pixabay no está configurada en el servidor." },
+  });
+  return body.images;
 }

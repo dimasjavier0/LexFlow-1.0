@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { PixabayPicker, type PixabayImage } from "../../components/pixabay-picker";
 import type { AlertTone } from "../../components/ui";
 import { Button, Field, Input, Select } from "../../components/ui";
 import { useAsyncAction } from "../../hooks/use-async-action";
 import { createWord } from "../../lib/admin-api";
 import { CEFR_LEVELS } from "../../lib/levels";
+import { ImagePicker, type PickedImage } from "./image-picker";
 import type { AdminLibrary } from "./use-admin-library";
 
 type QuickWordFormProps = {
@@ -17,8 +17,7 @@ export function QuickWordForm({ collectionId, library, notify }: QuickWordFormPr
   const [term, setTerm] = useState("");
   const [translationEs, setTranslationEs] = useState("");
   const [level, setLevel] = useState<string>(CEFR_LEVELS[0]);
-  const [imageUrl, setImageUrl] = useState("");
-  const [images, setImages] = useState<PixabayImage[]>([]);
+  const [images, setImages] = useState<PickedImage[]>([]);
   const save = useAsyncAction();
 
   const submit = async (event: FormEvent) => {
@@ -30,7 +29,7 @@ export function QuickWordForm({ collectionId, library, notify }: QuickWordFormPr
         term: term.trim(),
         translationEs: translationEs.trim(),
         level,
-        images: images.map((image) => ({ url: image.url, attribution: `Pixabay: ${image.user}`, metadata: { id: image.id, pageUrl: image.pageUrl, tags: image.tags } })),
+        images: images.map(({ previewUrl: _previewUrl, ...image }) => image),
       });
       library.upsertWords(collectionId, [word]);
     }, "No se pudo crear la palabra.");
@@ -38,7 +37,6 @@ export function QuickWordForm({ collectionId, library, notify }: QuickWordFormPr
     notify(`“${term.trim()}” añadida a la colección.`);
     setTerm("");
     setTranslationEs("");
-    setImageUrl("");
     setImages([]);
     void library.reloadCollections();
   };
@@ -60,8 +58,12 @@ export function QuickWordForm({ collectionId, library, notify }: QuickWordFormPr
         </Field>
         <Button type="submit" isLoading={save.isPending} loadingLabel="Guardando...">Añadir</Button>
       </div>
-      <Input type="text" inputMode="url" aria-label="URL de imagen o término de búsqueda" placeholder="URL de imagen" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} />
-      <PixabayPicker imageUrl={imageUrl} onImageUrlChange={setImageUrl} selectedImages={images} onSelectedImagesChange={setImages} />
+      <details className="rounded-xl border border-line px-3 py-2">
+        <summary className="cursor-pointer text-[0.82rem] font-semibold text-teal-dark">Añadir imágenes ({images.length}/4)</summary>
+        <div className="pt-3 pb-1">
+          <ImagePicker value={images} onChange={setImages} defaultQuery={term} />
+        </div>
+      </details>
       {save.error ? <p className="m-0 text-sm font-semibold text-danger" role="alert">{save.error}</p> : null}
     </form>
   );
