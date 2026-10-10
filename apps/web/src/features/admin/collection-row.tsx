@@ -155,7 +155,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
               {words.length === 0 ? <EmptyState title="Esta colección todavía no tiene palabras" description="Añade la primera con el formulario de abajo o usa la lista rápida." /> : null}
               {words.length > 0 && visibleWords.length === 0 ? <EmptyState title="Ninguna palabra coincide con el filtro" description="Cambia el filtro para ver el resto de la colección." /> : null}
               {visibleWords.length ? (
-                <ul className="m-0 grid list-none gap-1.5 p-0">
+                <ul className="m-0 grid list-none items-start gap-1.5 p-0 xl:grid-cols-2">
                   {visibleWords.map((word) => (
                     <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
                       {editingWordId === word.id ? (

@@ -9,9 +9,12 @@
 	--color-paper: #f8f6f1;
 	--color-surface: #ffffff;
 	--color-line: #dce7e8;
-	--color-teal: #159b9b;
-	--color-teal-dark: #087c81;
-	--color-teal-soft: #e0f3ef;
+	/* "teal" is the accent: it follows the tone picked in the theme switcher. */
+	--color-teal: var(--tone);
+	--color-teal-dark: var(--tone-strong);
+	--color-teal-soft: var(--tone-soft);
+	/* Text placed on a filled accent or danger background. */
+	--color-on-accent: #ffffff;
 	--color-coral: #f18f78;
 	--color-sun: #f5c96a;
 	--color-sun-soft: #fffaf0;
@@ -23,10 +26,39 @@
 	--shadow-lift: 0 18px 50px rgb(23 50 77 / 10%);
 }
 
+/* Tones: keep in sync with THEMES in lib/theme.ts. */
+:root { --tone: #159b9b; --tone-strong: #087c81; --tone-soft: #e0f3ef; }
+:root[data-theme="ocean"] { --tone: #2f7fd6; --tone-strong: #1f62ad; --tone-soft: #e3eefb; }
+:root[data-theme="violet"] { --tone: #7c5cd6; --tone-strong: #5f3fb8; --tone-soft: #ece6fa; }
+:root[data-theme="forest"] { --tone: #3f9a5f; --tone-strong: #2a7a47; --tone-soft: #e3f3e7; }
+:root[data-theme="sunset"] { --tone: #d9617a; --tone-strong: #b23f5a; --tone-soft: #fbe6ea; }
+
+/* Dark mode combines with any tone: neutrals flip and the accent is lightened. */
+:root[data-mode="dark"] {
+	color-scheme: dark;
+
+	--color-ink: #e6edf3;
+	--color-muted: #93a4b3;
+	--color-paper: #0f1720;
+	--color-surface: #18232f;
+	--color-line: #2b3a48;
+	--color-teal: color-mix(in oklab, var(--tone) 80%, white);
+	--color-teal-dark: color-mix(in oklab, var(--tone) 50%, white);
+	--color-teal-soft: color-mix(in oklab, var(--tone) 24%, #18232f);
+	--color-on-accent: #0f1720;
+	--color-sun-soft: #2c2616;
+	--color-warning: #ecc873;
+	--color-danger: #f29484;
+	--color-danger-soft: #3b211d;
+
+	--shadow-card: 0 8px 24px rgb(0 0 0 / 22%);
+	--shadow-lift: 0 18px 50px rgb(0 0 0 / 45%);
+}
+
 @layer base {
 	html { background: var(--color-paper); }
 	body { color: var(--color-ink); background: var(--color-paper); }
-	:focus-visible { outline: 3px solid rgb(21 155 155 / 30%); outline-offset: 3px; }
+	:focus-visible { outline: 3px solid color-mix(in oklab, var(--color-teal) 40%, transparent); outline-offset: 3px; }
 
 	@media (prefers-reduced-motion: reduce) {
 		*, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }

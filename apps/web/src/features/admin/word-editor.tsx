@@ -46,7 +46,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return <IconButton label={label} tone="plain" className="absolute top-1.5 right-1.5 size-6 bg-ink/80 text-xs text-white hover:bg-danger" onClick={onClick}>✕</IconButton>;
+  return <IconButton label={label} tone="plain" className="absolute top-1.5 right-1.5 size-6 bg-ink/80 text-xs text-paper hover:bg-danger" onClick={onClick}>✕</IconButton>;
 }
 
 export function WordEditor({ word, collections, initialCollectionId = "", onSaved, onMediaChange, onRemove, onCancel, className }: WordEditorProps) {
@@ -285,7 +285,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
           <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2.5 p-0">
             {videos.map((video) => (
               <li key={video.id} className="relative min-w-0">
-                <video className="aspect-video w-full rounded-lg bg-ink" controls preload="metadata" src={video.url} aria-label={`Video de ${term}`} />
+                <video className="aspect-video w-full rounded-lg bg-black" controls preload="metadata" src={video.url} aria-label={`Video de ${term}`} />
                 <a className="mt-1 block truncate text-[0.7rem] text-teal-dark" href={video.url} target="_blank" rel="noreferrer">{video.url}</a>
                 <RemoveButton
                   label="Eliminar video"

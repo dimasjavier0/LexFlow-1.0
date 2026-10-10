@@ -32,7 +32,7 @@ export function Modal({ title, eyebrow, onClose, children, size = "md" }: ModalP
       ref={dialogRef}
       aria-label={title}
       className={cn(
-        "m-auto max-h-[min(90vh,50rem)] w-[calc(100%-2rem)] overflow-auto rounded-2xl bg-surface p-0 text-ink shadow-lift backdrop:bg-ink/50",
+        "m-auto max-h-[min(90vh,50rem)] w-[calc(100%-2rem)] overflow-auto rounded-2xl bg-surface p-0 text-ink shadow-lift backdrop:bg-black/50",
         size === "lg" ? "max-w-3xl" : "max-w-xl",
       )}
       onCancel={(event) => {

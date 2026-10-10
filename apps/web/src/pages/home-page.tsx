@@ -100,8 +100,8 @@ export function HomePage() {
   const levelOptions = catalog && (catalog.levels.length > 1 || level) ? [{ value: ALL_LEVELS, label: "Todos" }, ...catalog.levels.map((item) => ({ value: item, label: item }))] : null;
 
   return (
-    <AppLayout className="bg-[radial-gradient(circle_at_88%_10%,rgb(224_243_239/85%),transparent_29rem)]">
-      <section className="mx-auto mt-16 mb-9 max-w-2xl sm:mt-24 sm:mb-13 sm:text-center">
+    <AppLayout className="bg-[radial-gradient(circle_at_88%_10%,var(--color-teal-soft),transparent_29rem)]">
+      <section className="mx-auto mt-16 mb-9 max-w-2xl sm:mt-20 sm:mb-11 sm:text-center">
         <Eyebrow>Tu ruta de vocabulario</Eyebrow>
         <h1 className="mx-auto mt-3 mb-3.5 max-w-xl text-[clamp(2.5rem,7vw,4.5rem)] leading-[0.98] font-bold tracking-tighter">Aprende una palabra cada vez.</h1>
         <p className="m-0 text-lg text-muted">Descubre vocabulario con imágenes, audio y contexto.</p>
@@ -120,7 +120,7 @@ export function HomePage() {
         </div>
       ) : null}
       {loadError ? <Alert className="mb-6" action={<Button variant="secondary" size="sm" onClick={() => setReloadKey((key) => key + 1)}>Reintentar</Button>}>{loadError}</Alert> : null}
-      <section className="grid gap-4.5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Colecciones de vocabulario" aria-busy={isLoading}>
+      <section className="grid gap-4.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" aria-label="Colecciones de vocabulario" aria-busy={isLoading}>
         {isLoading ? [0, 1, 2].map((item) => <CollectionCardSkeleton key={item} />) : null}
         {collections?.map((collection) => <CollectionCard key={collection.id} collection={collection} level={level} learnedCount={learnedByCollection ? (learnedByCollection[collection.id] ?? 0) : undefined} />)}
       </section>

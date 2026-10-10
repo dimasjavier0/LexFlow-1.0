@@ -36,7 +36,7 @@ export function WordRow({ word, isEditing, onToggleEdit, onPublish, onRemove, ch
   };
 
   return (
-    <li className={cn("overflow-hidden rounded-xl border bg-surface", isEditing ? "border-teal" : "border-line")}>
+    <li className={cn("overflow-hidden rounded-xl border bg-surface", isEditing ? "border-teal xl:col-span-2" : "border-line")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-2">
         <button type="button" aria-expanded={isEditing} onClick={onToggleEdit} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg p-1 text-left hover:bg-teal-soft/50">
           {cover ? (

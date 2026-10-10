@@ -93,7 +93,7 @@ export function ImagePicker({ value, onChange, defaultQuery = "", max = 4 }: Ima
           {value.map((image) => (
             <li key={image.url} className="relative">
               <img className="h-16 w-24 rounded-lg bg-teal-soft object-cover" src={image.previewUrl} alt="Imagen seleccionada" />
-              <IconButton label="Quitar imagen" className="absolute -top-1.5 -right-1.5 size-6 bg-ink text-xs text-white hover:bg-danger" tone="plain" onClick={() => onChange(value.filter((item) => item.url !== image.url))}>✕</IconButton>
+              <IconButton label="Quitar imagen" className="absolute -top-1.5 -right-1.5 size-6 bg-ink text-xs text-paper hover:bg-danger" tone="plain" onClick={() => onChange(value.filter((item) => item.url !== image.url))}>✕</IconButton>
             </li>
           ))}
         </ul>

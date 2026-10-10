@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./app";
 import { AuthProvider } from "./contexts/auth-context";
+import { applyThemeChoice, readThemeChoice } from "./lib/theme";
 import "./styles.css";
+
+applyThemeChoice(readThemeChoice());
 
 if ("serviceWorker" in navigator) {
 	window.addEventListener("load", () => void navigator.serviceWorker.register("/sw.js"));
