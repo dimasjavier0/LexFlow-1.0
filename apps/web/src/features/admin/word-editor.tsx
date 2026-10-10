@@ -16,7 +16,9 @@ import {
 } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
 import { CEFR_LEVELS } from "../../lib/levels";
+import { PART_OF_SPEECH_LABELS, type PartOfSpeech } from "../../lib/word-details";
 import { ImagePicker, type PickedImage } from "./image-picker";
+import { RelationList, SentenceList } from "./word-extras";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -56,6 +58,8 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [term, setTerm] = useState(word?.term ?? "");
   const [translation, setTranslation] = useState(word?.translationEs ?? "");
   const [level, setLevel] = useState(word?.level ?? CEFR_LEVELS[0]);
+  const [partOfSpeech, setPartOfSpeech] = useState<PartOfSpeech | "">(word?.partOfSpeech ?? "");
+  const [frequencyRank, setFrequencyRank] = useState(word?.frequencyRank ? String(word.frequencyRank) : "");
   const [collectionId, setCollectionId] = useState(initialCollectionId);
   const [newImages, setNewImages] = useState<PickedImage[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -127,7 +131,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     if (!session) return;
     let result: AdminWord | undefined;
     const saved = await save.run(async () => {
-      const fields = { term: term.trim(), translationEs: translation.trim(), level, images: newImages.map(({ previewUrl: _previewUrl, ...image }) => image) };
+      const fields = { term: term.trim(), translationEs: translation.trim(), level, partOfSpeech: partOfSpeech || null, frequencyRank: frequencyRank ? Number(frequencyRank) : null, images: newImages.map(({ previewUrl: _previewUrl, ...image }) => image) };
       let current = persisted ? await updateWord(session, persisted.id, fields) : await createWord(session, collectionId, fields);
       setPersisted(current);
       setNewImages([]);
@@ -174,6 +178,17 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
           <Select value={level} onChange={(event) => setLevel(event.target.value)}>
             {CEFR_LEVELS.map((item) => <option key={item}>{item}</option>)}
           </Select>
+        </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Categoría gramatical">
+          <Select value={partOfSpeech} onChange={(event) => setPartOfSpeech(event.target.value as PartOfSpeech | "")}>
+            <option value="">Sin especificar</option>
+            {Object.entries(PART_OF_SPEECH_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Select>
+        </Field>
+        <Field label="Frecuencia de uso" hint="Opcional. Posición en un corpus: 1 es la palabra más usada.">
+          <Input type="number" inputMode="numeric" min={1} max={1000000} step={1} value={frequencyRank} onChange={(event) => setFrequencyRank(event.target.value)} placeholder="350" />
         </Field>
       </div>
       {persisted ? null : (
@@ -255,6 +270,14 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
           </>
         ) : <p className="m-0 text-xs text-muted">Podrás generar la pronunciación después de guardar la palabra.</p>}
         <Input type="url" aria-label="Enlace de audio" placeholder="…o pega el enlace de un audio (https://...)" value={audioUrl} onChange={(event) => setAudioUrl(event.target.value)} />
+      </Section>
+
+      <Section title="Oraciones de ejemplo">
+        {persisted ? <SentenceList word={persisted} mutate={mutateMedia} /> : <p className="m-0 text-xs text-muted">Podrás añadir oraciones después de guardar la palabra.</p>}
+      </Section>
+
+      <Section title="Palabras relacionadas">
+        {persisted ? <RelationList word={persisted} mutate={mutateMedia} /> : <p className="m-0 text-xs text-muted">Podrás enlazar sinónimos y antónimos después de guardar la palabra.</p>}
       </Section>
 
       <Section title="Videos">

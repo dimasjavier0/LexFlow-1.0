@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import type { CefrLevel } from "./levels";
+import type { ExampleSentence, PartOfSpeech, WordRelationshipType } from "./word-details";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 
@@ -29,6 +30,9 @@ export type ApiWord = {
   term: string;
   translationEs: string;
   level: string;
+  partOfSpeech: PartOfSpeech | null;
+  sentences: ExampleSentence[];
+  relationsFrom: Array<{ id: string; type: WordRelationshipType; target: { term: string; translationEs: string } }>;
   images: Array<{ id: string; url: string; attribution: string | null }>;
   audios: Array<{ id: string; url: string }>;
   videos: Array<{ id: string; url: string }>;

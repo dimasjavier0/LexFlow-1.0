@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { apiRequest } from "./api";
+import type { ExampleSentence, PartOfSpeech, WordRelationshipType } from "./word-details";
 
 export type AdminCollection = {
   id: string;
@@ -13,12 +14,28 @@ export type AdminCollection = {
 
 export type AdminAudio = { id: string; url: string; voice?: string | null; accent?: string | null; provider?: string | null };
 
+export type AdminWordRelation = { id: string; type: WordRelationshipType; target: { id: string; term: string } };
+
+/** Editable fields of a word, shared by create and update. */
+export type WordFields = {
+  term: string;
+  translationEs: string;
+  level: string;
+  partOfSpeech?: PartOfSpeech | null;
+  frequencyRank?: number | null;
+  images?: NewWordImage[];
+};
+
 export type AdminWord = {
   id: string;
   term: string;
   translationEs: string;
   level: string;
   isPublished: boolean;
+  partOfSpeech: PartOfSpeech | null;
+  frequencyRank: number | null;
+  sentences: ExampleSentence[];
+  relationsFrom: AdminWordRelation[];
   images: Array<{ id: string; url: string }>;
   audios: AdminAudio[];
   videos: Array<{ id: string; url: string }>;
@@ -76,7 +93,7 @@ export async function listWords(session: Session, collectionId: string): Promise
 export async function createWord(
   session: Session,
   collectionId: string,
-  input: { term: string; translationEs: string; level: string; images?: NewWordImage[] },
+  input: WordFields,
 ): Promise<AdminWord> {
   const body = await apiRequest<{ word: { word: AdminWord } }>(`/admin/collections/${collectionId}/words`, {
     method: "POST",
@@ -124,7 +141,7 @@ export async function searchImages(session: Session, query: string, page: number
 export async function updateWord(
   session: Session,
   wordId: string,
-  input: { term: string; translationEs: string; level: string; images?: NewWordImage[] },
+  input: WordFields,
 ): Promise<AdminWord> {
   const body = await apiRequest<{ word: AdminWord }>(`/admin/words/${wordId}`, {
     method: "PATCH",
@@ -201,4 +218,33 @@ export async function deleteCollection(session: Session, collectionId: string): 
 /** Removes a word from a collection; the word itself is deleted if no other collection uses it. */
 export async function removeWordFromCollection(session: Session, collectionId: string, wordId: string): Promise<void> {
   await apiRequest(`/admin/collections/${collectionId}/words/${wordId}`, { method: "DELETE", session, errorMessage: "No se pudo quitar la palabra." });
+}
+
+export async function addWordSentence(session: Session, wordId: string, input: { text: string; translationEs: string | null }): Promise<ExampleSentence> {
+  const body = await apiRequest<{ sentence: ExampleSentence }>(`/admin/words/${wordId}/sentences`, { method: "POST", session, body: input, errorMessage: "No se pudo añadir la oración." });
+  return body.sentence;
+}
+
+export async function deleteWordSentence(session: Session, sentenceId: string): Promise<void> {
+  await apiRequest(`/admin/sentences/${sentenceId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar la oración." });
+}
+
+/** Links a word to another existing word, looked up by its English term. */
+export async function addWordRelation(session: Session, wordId: string, input: { term: string; type: WordRelationshipType }): Promise<AdminWordRelation> {
+  const body = await apiRequest<{ relation: AdminWordRelation }>(`/admin/words/${wordId}/relations`, {
+    method: "POST",
+    session,
+    body: input,
+    errorMessage: "No se pudo añadir la relación.",
+    statusMessages: {
+      400: "Una palabra no puede relacionarse consigo misma.",
+      404: `“${input.term}” no existe en la biblioteca. Créala primero.`,
+      409: "Esa relación ya existe.",
+    },
+  });
+  return body.relation;
+}
+
+export async function deleteWordRelation(session: Session, relationId: string): Promise<void> {
+  await apiRequest(`/admin/relations/${relationId}`, { method: "DELETE", session, errorMessage: "No se pudo eliminar la relación." });
 }

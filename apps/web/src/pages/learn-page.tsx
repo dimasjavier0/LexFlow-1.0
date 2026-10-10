@@ -9,6 +9,7 @@ import { AppLayout } from "../layouts/app-layout";
 import { getCollection, getProgress, updateProgress, type ApiCollection, type LearningStatus } from "../lib/api";
 import { cn } from "../lib/cn";
 import { isCefrLevel, LEARNING_STATUS_LABELS } from "../lib/levels";
+import { PART_OF_SPEECH_LABELS, RELATIONSHIP_LABELS } from "../lib/word-details";
 
 const STATUS_ACTIONS: Array<{ status: LearningStatus; icon: string; className: string }> = [
   { status: "WANT_TO_LEARN", icon: "+", className: "bg-sun/25 text-warning" },
@@ -180,6 +181,7 @@ export function LearnPage() {
       <div className="mt-12 mb-7 text-center sm:mt-16">
         <Eyebrow>{collection.name}{level ? ` · Nivel ${level}` : ""}</Eyebrow>
         <h1 className="mt-2.5 mb-5 text-[clamp(2.6rem,8vw,4.8rem)] leading-[0.95] font-bold tracking-tighter break-words">{currentWord.term}</h1>
+        {currentWord.partOfSpeech ? <p className="-mt-2 mb-4 text-sm text-muted italic">{PART_OF_SPEECH_LABELS[currentWord.partOfSpeech].toLowerCase()}</p> : null}
         <div className="mx-auto h-1.5 max-w-64 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="Avance en la colección" aria-valuemin={1} aria-valuemax={wordCount} aria-valuenow={wordIndex + 1}>
           <span className="block h-full rounded-full bg-teal transition-[width] duration-200" style={{ width: `${((wordIndex + 1) / wordCount) * 100}%` }} />
         </div>
@@ -202,6 +204,27 @@ export function LearnPage() {
           <span className={cn("transition-[filter] duration-200", !isTranslationVisible && "blur-sm select-none")} aria-hidden={!isTranslationVisible}>{currentWord.translationEs}</span>
           <small className="text-[0.7rem] font-extrabold text-teal-dark">{isTranslationVisible ? "Traducción" : "Toca para descubrir la traducción"}</small>
         </button>
+        {currentWord.sentences.length ? (
+          <ul className="mx-0 mt-4 mb-0 grid list-none gap-2 p-0">
+            {currentWord.sentences.map((sentence) => (
+              <li key={sentence.id} className="rounded-xl border-l-4 border-teal-soft bg-paper/60 px-4 py-2.5">
+                <p className="m-0 font-semibold">{sentence.text}</p>
+                {sentence.translationEs && isTranslationVisible ? <p className="mt-0.5 mb-0 text-sm text-muted">{sentence.translationEs}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {currentWord.relationsFrom.length ? (
+          <ul className="mx-0 mt-3 mb-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Palabras relacionadas">
+            {currentWord.relationsFrom.map((relation) => (
+              <li key={relation.id}>
+                <Badge tone="neutral" className="font-semibold">
+                  <span className="font-normal">{RELATIONSHIP_LABELS[relation.type]}:</span> {relation.target.term}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {currentVideo ? (
           <div className="mt-4 grid gap-1 text-center">
             {VIDEO_FILE_PATTERN.test(currentVideo.url) ? (
