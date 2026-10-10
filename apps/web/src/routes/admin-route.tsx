@@ -1,11 +1,11 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/auth-context";
-import { AuthLayout } from "../layouts/auth-layout";
+import { StatusPage } from "../components/status-page";
 
 export function AdminRoute() {
   const { apiUser, isSyncingUser } = useAuth();
 
-  if (isSyncingUser) return <AuthLayout>Comprobando permisos...</AuthLayout>;
+  if (isSyncingUser) return <StatusPage isLoading>Comprobando permisos...</StatusPage>;
   if (apiUser?.role !== "ADMIN") return <Navigate to="/" replace />;
   return <Outlet />;
 }
