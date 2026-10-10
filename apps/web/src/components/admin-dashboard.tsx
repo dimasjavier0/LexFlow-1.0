@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/auth-context";
 import { EditableWord, WordEditor } from "./word-editor";
 import { PixabayPicker, type PixabayImage } from "./pixabay-picker";
@@ -43,7 +42,7 @@ function parseBulkLines(value: string): BulkLine[] {
 }
 
 export function AdminDashboard() {
-  const { apiUser, isLoading, isSyncingUser, session } = useAuth();
+  const { session } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [wordsByCollection, setWordsByCollection] = useState<
@@ -96,10 +95,6 @@ export function AdminDashboard() {
       ),
     );
   }, [session]);
-
-  if (isLoading || isSyncingUser)
-    return <main className="auth-page">Comprobando permisos...</main>;
-  if (apiUser?.role !== "ADMIN") return <Navigate to="/" replace />;
 
   const toggleCollection = async (collection: Collection) => {
     const open = !expanded[collection.id];

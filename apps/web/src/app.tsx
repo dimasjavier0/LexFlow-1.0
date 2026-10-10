@@ -3,7 +3,8 @@ import { LoginPage } from "./components/login-page";
 import { HomePage } from "./components/home-page";
 import { LearnPage } from "./components/learn-page";
 import { AdminDashboard } from "./components/admin-dashboard";
-import { ProtectedRoute } from "./components/protected-route";
+import { AdminRoute } from "./routes/admin-route";
+import { ProtectedRoute } from "./routes/protected-route";
 
 export function App() {
   return (
@@ -12,7 +13,9 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/learn/:collectionSlug" element={<LearnPage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
