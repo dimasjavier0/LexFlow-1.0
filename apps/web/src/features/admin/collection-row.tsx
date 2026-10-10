@@ -82,7 +82,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
     if (!session) return;
     try {
       await removeWordFromCollection(session, collection.id, word.id);
-      onEditWord(null);
+      if (editingWordId === word.id) onEditWord(null);
       library.removeWord(collection.id, word.id);
       notify(`“${word.term}” quitada de la colección.`);
       void library.reloadCollections();
@@ -157,7 +157,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
               {visibleWords.length ? (
                 <ul className="m-0 grid list-none gap-1.5 p-0">
                   {visibleWords.map((word) => (
-                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} onPublish={(isPublished) => publishWord(word, isPublished)}>
+                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
                       {editingWordId === word.id ? (
                         <WordEditor
                           word={word}

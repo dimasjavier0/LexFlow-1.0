@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Badge, Switch } from "../../components/ui";
+import { Badge, Button, IconButton, Switch } from "../../components/ui";
 import type { AdminWord } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
 
@@ -9,18 +9,30 @@ type WordRowProps = {
   onToggleEdit: () => void;
   /** Persists the new publication state; rejections are handled by the caller. */
   onPublish: (isPublished: boolean) => Promise<void>;
+  /** Removes the word from the collection; rejections are handled by the caller. */
+  onRemove: () => Promise<void>;
   /** Inline editor, rendered under the row while editing. */
   children?: ReactNode;
 };
 
-export function WordRow({ word, isEditing, onToggleEdit, onPublish, children }: WordRowProps) {
+export function WordRow({ word, isEditing, onToggleEdit, onPublish, onRemove, children }: WordRowProps) {
   const [cover, ...otherImages] = word.images;
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   const publish = async (isPublished: boolean) => {
     setIsPublishing(true);
     await onPublish(isPublished);
     setIsPublishing(false);
+  };
+
+  const remove = async () => {
+    setIsRemoving(true);
+    await onRemove();
+    // Still mounted only if the removal failed.
+    setIsRemoving(false);
+    setIsConfirmingRemoval(false);
   };
 
   return (
@@ -49,6 +61,14 @@ export function WordRow({ word, isEditing, onToggleEdit, onPublish, children }: 
             onText="Publicada"
             offText="Borrador"
           />
+          {isConfirmingRemoval ? (
+            <>
+              <Button variant="danger" size="sm" isLoading={isRemoving} loadingLabel="Quitando..." onClick={() => void remove()}>Sí, quitar</Button>
+              <Button variant="ghost" size="sm" disabled={isRemoving} onClick={() => setIsConfirmingRemoval(false)}>Cancelar</Button>
+            </>
+          ) : (
+            <IconButton label={`Quitar ${word.term} de la colección`} tone="plain" className="hover:bg-danger-soft! hover:text-danger!" onClick={() => setIsConfirmingRemoval(true)}>✕</IconButton>
+          )}
         </div>
       </div>
       {children}
