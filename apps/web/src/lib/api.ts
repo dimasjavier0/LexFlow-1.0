@@ -55,6 +55,13 @@ export class ApiError extends Error {
   }
 }
 
+/** Failures that mean the same thing on every endpoint. */
+const COMMON_STATUS_MESSAGES: Record<number, string> = {
+  401: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+  403: "No tienes permiso para hacer esto.",
+  429: "Demasiadas peticiones seguidas. Espera un momento e inténtalo de nuevo.",
+};
+
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   session?: Session | null;
@@ -90,7 +97,7 @@ export async function apiRequest<T = void>(path: string, options: RequestOptions
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const serverMessage = preferServerMessage && typeof (payload as { message?: unknown } | null)?.message === "string" ? (payload as { message: string }).message : null;
-    throw new ApiError(serverMessage ?? statusMessages?.[response.status] ?? errorMessage, response.status);
+    throw new ApiError(serverMessage ?? statusMessages?.[response.status] ?? COMMON_STATUS_MESSAGES[response.status] ?? errorMessage, response.status);
   }
   return payload as T;
 }
