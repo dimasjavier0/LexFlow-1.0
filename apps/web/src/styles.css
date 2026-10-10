@@ -36,16 +36,6 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .primary-button:disabled { cursor: wait; opacity: 0.65; }
 .error-message { color: #b91c1c; font-size: 0.875rem; }
 .secondary-button { display: inline-block; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; background: white; cursor: pointer; font: inherit; text-decoration: none; }
-.learning-panel { padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; }
-.learning-image, .image-placeholder { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #e2e8f0; }
-.image-placeholder { display: grid; place-items: center; color: #64748b; }
-.translation-button { display: block; width: 100%; margin-top: 20px; border: 0; background: transparent; color: #0e7490; cursor: pointer; font: inherit; font-size: 1.25rem; }
-.translation-hidden { filter: blur(7px); user-select: none; }
-.progress-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
-.progress-actions button { padding: 12px 14px; border: 0; border-radius: 8px; color: white; background: #0f172a; cursor: pointer; font: inherit; }
-.progress-actions button:nth-child(2) { background: #64748b; }
-.progress-actions button:nth-child(3) { background: #047857; }
-.progress-actions button:disabled { cursor: wait; opacity: 0.6; }
 .admin-form { display: grid; gap: 12px; max-width: 520px; margin-top: 28px; }
 .admin-form input { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
 .admin-select { padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; font: inherit; }
@@ -143,9 +133,6 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .associated-video-card a { display: block; overflow: hidden; margin-top: 7px; color: var(--teal-dark); font-size: .7rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .collection-modal-preview { width: 100%; max-height: 180px; object-fit: cover; border-radius: 12px; background: var(--teal-soft); }
 .editor-image-preview { width: 100%; max-height: 140px; object-fit: contain; border-radius: 8px; background: #e2e8f0; }
-.media-carousel { display: grid; gap: 10px; }
-.carousel-controls { display: flex; align-items: center; justify-content: center; gap: 18px; color: #64748b; }
-.video-carousel { margin-top: 18px; }
 .editor-image-preview { width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; background: #e2e8f0; }
 @media (max-width: 760px) { .action-grid, .form-grid { grid-template-columns: 1fr; } .admin-shell { padding: 28px 16px; } .admin-header { flex-direction: column; } .admin-panel { padding: 20px; } }
 html { background: #f8fafc; }
@@ -169,33 +156,8 @@ html { background: var(--paper); }
 body { color: var(--ink); font-family: "Trebuchet MS", "Segoe UI", sans-serif; background: var(--paper); }
 button, input, select { font-family: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgb(21 155 155 / 30%); outline-offset: 3px; }
-.app-shell { min-height: 100vh; box-sizing: border-box; padding: 28px max(22px, calc((100vw - 1060px) / 2)) 64px; }
-.learn-topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; max-width: 1060px; margin: 0 auto; }
 .eyebrow { margin: 0; color: var(--teal-dark); font-size: .68rem; font-weight: 900; letter-spacing: .16em; }
-.status-page { display: grid; min-height: 100vh; place-items: center; gap: 12px; color: var(--muted); background: var(--paper); }
-.loading-mark { width: 22px; height: 22px; border: 3px solid var(--teal-soft); border-top-color: var(--teal); border-radius: 50%; animation: spin 800ms linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
-.learn-shell { max-width: 800px; margin: 0 auto; padding-top: 24px; }
-.learn-topbar { max-width: none; }
-.back-link { color: var(--teal-dark); font-size: .85rem; font-weight: 800; text-decoration: none; }
-.learn-counter { color: var(--muted); font-size: .78rem; font-weight: 700; }
-.level-pill { padding: 8px 12px; border-radius: 999px; color: var(--teal-dark); background: var(--teal-soft); font-size: .72rem; font-weight: 900; letter-spacing: .08em; }
-.learning-heading { margin: 68px auto 28px; text-align: center; }
-.learning-heading h1 { margin: 10px 0 22px; color: var(--ink); font-size: clamp(2.6rem, 8vw, 4.8rem); line-height: .95; letter-spacing: -.06em; }
-.learning-progress { height: 5px; max-width: 270px; margin: 0 auto; overflow: hidden; border-radius: 5px; background: var(--line); }
-.learning-progress span { display: block; height: 100%; border-radius: inherit; background: var(--teal); transition: width 240ms ease; }
-.learning-panel { padding: clamp(16px, 4vw, 30px); border: 1px solid var(--line); border-radius: 26px; background: var(--surface); box-shadow: var(--shadow); }
-.image-stage { overflow: hidden; border-radius: 18px; background: #e8f0ed; }
-.learning-image, .image-placeholder { aspect-ratio: 1.45 / 1; border-radius: 18px; }
-.learning-image { object-fit: cover; }
-.image-placeholder { display: grid; place-items: center; color: var(--muted); background: var(--teal-soft); }
-.carousel-controls { display: flex; align-items: center; justify-content: center; gap: 15px; padding: 12px 0; color: var(--muted); font-size: .75rem; font-weight: 700; }
-.round-button { display: grid; width: 35px; height: 35px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; color: var(--teal-dark); background: var(--surface); cursor: pointer; font-size: 1.05rem; }
-.round-button:hover { border-color: var(--teal); background: var(--teal-soft); }
-.word-tools { display: grid; grid-template-columns: 35px 1fr 35px; align-items: center; gap: 16px; margin: 20px 0 12px; }
-.word-tools > div { display: flex; justify-content: center; min-width: 0; }
-.word-tools audio { width: min(100%, 370px); height: 38px; }
 .audio-missing { color: var(--muted); font-size: .78rem; }
 .audio-generator { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #f4faf8; }
 .audio-generator audio { width: 100%; height: 38px; }
@@ -203,20 +165,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .audio-record small { color: var(--muted); font-size: .7rem; }
 .audio-generator-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .audio-generator-controls select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); font: inherit; }
-.translation-button { display: grid; gap: 7px; width: 100%; margin: 14px 0; padding: 16px; border: 0; border-radius: 16px; color: var(--ink); background: #f7f4ee; cursor: pointer; font-size: 1.7rem; font-weight: 900; text-align: center; }
-.translation-button small { color: var(--teal-dark); font-size: .7rem; font-weight: 800; }
-.translation-hidden { filter: blur(8px); user-select: none; }
-.saved-status { margin: 14px 0; color: var(--muted); font-size: .75rem; text-align: center; }
-.video-link { margin-top: 18px; text-align: center; }
-.video-link a { color: var(--teal-dark); font-size: .82rem; font-weight: 800; text-decoration: none; }
-.video-link .carousel-controls { padding-bottom: 0; }
-.progress-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 25px; }
-.learn-action { min-height: 52px; padding: 10px 8px; border: 0; border-radius: 13px; cursor: pointer; font-size: .78rem; font-weight: 800; }
-.learn-action span { margin-right: 5px; font-size: 1.1rem; }
-.action-learn { color: #a65e42; background: #fff0dc; }
-.action-skip { color: var(--muted); background: #eef1f0; }
-.action-done { color: #16766e; background: var(--teal-soft); }
-.learn-action:disabled { cursor: wait; opacity: .55; }
 
 .primary-button { border-radius: 12px; color: white; background: var(--teal-dark); font-weight: 800; }
 .secondary-button { border-color: var(--line); border-radius: 10px; color: var(--teal-dark); }
@@ -254,10 +202,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .drop-zone:hover { border-color: var(--teal); background: var(--teal-soft); }
 
 @media (max-width: 760px) {
-	.app-shell { padding: 22px 16px 42px; }
-	.learning-heading { margin-top: 48px; }
-	.learning-panel { border-radius: 20px; }
-	.learn-action { font-size: .7rem; }
 	.action-grid, .form-grid { grid-template-columns: 1fr; }
 	.quick-word-form { grid-template-columns: 1fr 1fr; }
 	.quick-word-form strong { grid-column: 1 / -1; }
