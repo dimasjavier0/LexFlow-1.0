@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/login-page";
 import { HomePage } from "./pages/home-page";
 import { LearnPage } from "./pages/learn-page";
+import { ProfilePage } from "./pages/profile-page";
 import { ReviewPage } from "./pages/review-page";
 import { AdminDashboard } from "./features/admin/admin-dashboard";
 import { AdminRoute } from "./routes/admin-route";
@@ -15,6 +16,7 @@ export function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/learn/:collectionSlug" element={<LearnPage />} />
         <Route path="/review" element={<ReviewPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>

@@ -105,6 +105,8 @@ export function ReviewPage() {
     const correct = results.filter((entry) => entry.result !== "incorrect").length;
     const mastered = results.filter((entry) => entry.outcome.becameMastered).length;
     const remaining = Math.max(0, totalDue - items.length);
+    const points = results.reduce((sum, entry) => sum + entry.outcome.pointsEarned, 0);
+    const stats = results.at(-1)?.outcome.stats;
     return (
       <AppLayout width="narrow" topbar={topbar}>
         <section className="mt-14 grid justify-items-center gap-5 rounded-3xl border border-line bg-surface p-6 text-center shadow-lift sm:p-10">
@@ -114,8 +116,23 @@ export function ReviewPage() {
             Recordaste {correct} de {results.length} {results.length === 1 ? "palabra" : "palabras"}.
             {mastered ? ` ${mastered === 1 ? "Una palabra pasó" : `${mastered} palabras pasaron`} a dominadas.` : ""}
           </p>
+          {stats ? (
+            <dl className="m-0 grid w-full max-w-md grid-cols-3 gap-2">
+              {[
+                { label: "Puntos ganados", value: `+${points}` },
+                { label: "Nivel", value: stats.level },
+                { label: stats.streakCurrent === 1 ? "Día de racha" : "Días de racha", value: stats.streakCurrent },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-2xl bg-teal-soft px-2 py-4 text-teal-dark">
+                  <dd className="m-0 text-3xl font-black">{stat.value}</dd>
+                  <dt className="mt-1 text-[0.7rem] font-extrabold">{stat.label}</dt>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           <div className="flex flex-wrap justify-center gap-2">
             {remaining ? <Button onClick={() => setReloadKey((key) => key + 1)}>Seguir repasando ({remaining})</Button> : null}
+            <Link className={buttonClasses({ variant: "secondary" })} to="/profile">Ver mi progreso</Link>
             {backLink}
           </div>
         </section>
@@ -163,6 +180,7 @@ export function ReviewPage() {
               {answered.result === "incorrect" ? `La palabra era “${word.term}”.` : answered.result === "hard" ? "Correcto, con pista." : "¡Correcto!"}{" "}
               {answered.outcome.becameMastered ? "¡Ya la dominas! " : ""}
               {nextReviewLabel(answered.outcome.progress.intervalDays)}
+              {answered.outcome.pointsEarned ? ` +${answered.outcome.pointsEarned} puntos.` : ""}
             </Alert>
             <div className="grid gap-1 rounded-2xl bg-paper p-4 text-center">
               <strong className="text-2xl">{word.translationEs}</strong>

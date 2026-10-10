@@ -12,6 +12,16 @@ export type ApiUser = {
   id: string;
   email: string;
   role: "USER" | "ADMIN";
+  name: string | null;
+  avatarUrl: string | null;
+  pointsTotal: number;
+  /** Derived from the points: level n starts at (n - 1)² × 100. */
+  level: number;
+  pointsIntoLevel: number;
+  pointsForLevel: number;
+  /** Consecutive days with at least one review; 0 once a day is missed. */
+  streakCurrent: number;
+  streakBest: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -164,6 +174,8 @@ export type ReviewItem = {
 export type ReviewOutcome = {
   progress: { wordId: string; stage: SrsStage; repetitions: number; intervalDays: number; nextReviewAt: string };
   becameMastered: boolean;
+  pointsEarned: number;
+  stats: { pointsTotal: number; level: number; streakCurrent: number; streakBest: number };
 };
 
 /** Words due for spaced-repetition review, most overdue first. `total` may exceed the page. */
@@ -173,4 +185,25 @@ export async function getDueReviews(session: Session, limit: number): Promise<{ 
 
 export async function submitReview(session: Session, wordId: string, result: ReviewResult): Promise<ReviewOutcome> {
   return apiRequest<ReviewOutcome>(`/reviews/${encodeURIComponent(wordId)}`, { method: "POST", session, body: { result }, errorMessage: "No se pudo guardar tu respuesta." });
+}
+
+export type Dashboard = {
+  user: ApiUser;
+  words: { wantToLearn: number; learned: number; notInterested: number };
+  review: { due: number; new: number; learning: number; mastered: number };
+};
+
+export async function getDashboard(session: Session): Promise<Dashboard> {
+  return apiRequest<Dashboard>("/me/dashboard", { session, errorMessage: "No se pudo cargar tu progreso." });
+}
+
+export async function updateProfile(session: Session, input: { name: string | null; avatarUrl: string | null }): Promise<ApiUser> {
+  const body = await apiRequest<{ user: ApiUser }>("/me", {
+    method: "PATCH",
+    session,
+    body: input,
+    errorMessage: "No se pudo guardar tu perfil.",
+    statusMessages: { 400: "Revisa el nombre y que el avatar sea una URL válida." },
+  });
+  return body.user;
 }
