@@ -148,3 +148,29 @@ export async function getProgressSummary(session: Session, level: CefrLevel | nu
   const body = await apiRequest<{ summary: Array<{ collectionId: string; learned: number }> }>(`/progress/summary${levelQuery(level)}`, { session, errorMessage: "No se pudo cargar tu progreso." });
   return Object.fromEntries(body.summary.map((item) => [item.collectionId, item.learned]));
 }
+
+export type ReviewResult = "correct" | "hard" | "incorrect";
+export type SrsStage = "NEW" | "LEARNING" | "MASTERED";
+
+export type ReviewItem = {
+  stage: SrsStage;
+  repetitions: number;
+  word: Pick<ApiWord, "id" | "term" | "translationEs" | "level" | "partOfSpeech" | "sentences"> & {
+    images: Array<{ id: string; url: string }>;
+    audios: Array<{ id: string; url: string }>;
+  };
+};
+
+export type ReviewOutcome = {
+  progress: { wordId: string; stage: SrsStage; repetitions: number; intervalDays: number; nextReviewAt: string };
+  becameMastered: boolean;
+};
+
+/** Words due for spaced-repetition review, most overdue first. `total` may exceed the page. */
+export async function getDueReviews(session: Session, limit: number): Promise<{ total: number; items: ReviewItem[] }> {
+  return apiRequest(`/reviews/due?limit=${limit}`, { session, errorMessage: "No se pudieron cargar tus repasos." });
+}
+
+export async function submitReview(session: Session, wordId: string, result: ReviewResult): Promise<ReviewOutcome> {
+  return apiRequest<ReviewOutcome>(`/reviews/${encodeURIComponent(wordId)}`, { method: "POST", session, body: { result }, errorMessage: "No se pudo guardar tu respuesta." });
+}

@@ -21,6 +21,7 @@ function AppTopbar() {
       <BrandMark />
       <nav className="flex items-center gap-2" aria-label="Navegación principal">
         {apiUser?.role === "ADMIN" ? <Link className={buttonClasses({ variant: "secondary", size: "sm" })} to="/admin">Panel admin</Link> : null}
+        {isAuthenticated ? <Link className={buttonClasses({ variant: "ghost", size: "sm" })} to="/review">Repasar</Link> : null}
         {isAuthenticated ? (
           <Button variant="ghost" size="sm" onClick={() => void signOut()}>Salir</Button>
         ) : (

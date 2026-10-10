@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { CollectionCard, CollectionCardSkeleton } from "../components/collection-card";
-import { Alert, Button, EmptyState, Eyebrow, FilterChips } from "../components/ui";
+import { Alert, Button, buttonClasses, EmptyState, Eyebrow, FilterChips } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
 import { errorMessage } from "../hooks/use-async-action";
 import { AppLayout } from "../layouts/app-layout";
-import { getCollections, getProgressSummary, type CollectionCatalog } from "../lib/api";
+import { Link } from "react-router-dom";
+import { getCollections, getDueReviews, getProgressSummary, type CollectionCatalog } from "../lib/api";
 import { isCefrLevel, type CefrLevel } from "../lib/levels";
 
 const LEVEL_STORAGE_KEY = "lexflow.level";
@@ -35,6 +36,7 @@ export function HomePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [learnedByCollection, setLearnedByCollection] = useState<Record<string, number> | null>(null);
+  const [dueCount, setDueCount] = useState(0);
 
   useEffect(() => {
     let isCurrent = true;
@@ -68,6 +70,22 @@ export function HomePage() {
     };
   }, [level, session]);
 
+  useEffect(() => {
+    let isCurrent = true;
+    if (!session) {
+      setDueCount(0);
+      return;
+    }
+    getDueReviews(session, 1)
+      .then((queue) => {
+        if (isCurrent) setDueCount(queue.total);
+      })
+      .catch(() => undefined);
+    return () => {
+      isCurrent = false;
+    };
+  }, [session]);
+
   const chooseLevel = useCallback((value: string) => {
     const next = isCefrLevel(value) ? value : null;
     storeLevel(next);
@@ -88,6 +106,11 @@ export function HomePage() {
         <p className="m-0 text-lg text-muted">Descubre vocabulario con imágenes, audio y contexto.</p>
         {apiUser ? <p className="mt-5 text-xs text-muted">Conectado como {apiUser.email}</p> : null}
       </section>
+      {dueCount ? (
+        <Alert tone="info" className="mb-6" action={<Link className={buttonClasses({ size: "sm", className: "shrink-0" })} to="/review">Repasar ahora</Link>}>
+          {dueCount === 1 ? "Tienes 1 palabra pendiente de repaso." : `Tienes ${dueCount} palabras pendientes de repaso.`}
+        </Alert>
+      ) : null}
       {levelOptions ? (
         <div className="mb-5 flex sm:justify-center">
           <FilterChips label="Nivel" options={levelOptions} value={level ?? ALL_LEVELS} onChange={chooseLevel} />
