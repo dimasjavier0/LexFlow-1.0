@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { PixabayPicker, type PixabayImage } from "../../components/pixabay-picker";
-import { Alert, Button, Field, Input, Modal } from "../../components/ui";
+import { Alert, Button, Field, Input, Modal, Textarea } from "../../components/ui";
 import { useAsyncAction } from "../../hooks/use-async-action";
 import { createCollection, updateCollection, type AdminCollection } from "../../lib/admin-api";
+import { slugify } from "../../lib/slug";
 import type { AdminLibrary } from "./use-admin-library";
 
 type CollectionFormModalProps = {
@@ -15,20 +16,24 @@ type CollectionFormModalProps = {
 
 export function CollectionFormModal({ collection, library, onClose, onSaved }: CollectionFormModalProps) {
   const [name, setName] = useState(collection?.name ?? "");
-  const [slug, setSlug] = useState(collection?.slug ?? "");
+  // Until the admin types a slug of their own, it follows the name.
+  const [customSlug, setCustomSlug] = useState<string | null>(null);
+  const [description, setDescription] = useState(collection?.description ?? "");
   const [imageUrl, setImageUrl] = useState(collection?.imageUrl ?? "");
   const [pixabayImages, setPixabayImages] = useState<PixabayImage[]>([]);
   const save = useAsyncAction();
   const isEditing = collection !== undefined;
+  const slug = customSlug ?? slugify(name);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const { session } = library;
     if (!session) return;
     const cover = imageUrl.trim() || pixabayImages[0]?.url || null;
+    const details = { name: name.trim(), description: description.trim() || null, imageUrl: cover };
     const saved = await save.run(async () => {
-      if (collection) await updateCollection(session, collection.id, { name, imageUrl: cover });
-      else await createCollection(session, { name, slug, imageUrl: cover });
+      if (collection) await updateCollection(session, collection.id, details);
+      else await createCollection(session, { ...details, slug });
       await library.reloadCollections();
     }, "No se pudo guardar la colección.");
     if (saved) onSaved(isEditing ? "Colección actualizada." : "Colección creada.");
@@ -41,10 +46,13 @@ export function CollectionFormModal({ collection, library, onClose, onSaved }: C
           <Input required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} placeholder="Colors" />
         </Field>
         {isEditing ? null : (
-          <Field label="Slug" hint="Minúsculas, números y guiones. Se usa en la URL.">
-            <Input required maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="colors" />
+          <Field label="Slug" hint={`Se genera a partir del nombre. La colección se abrirá en /learn/${slug || "..."}`}>
+            <Input required maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={slug} onChange={(event) => setCustomSlug(event.target.value)} placeholder="colors" />
           </Field>
         )}
+        <Field label="Descripción" hint="Opcional. Se muestra en la tarjeta de la colección.">
+          <Textarea rows={2} maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Vocabulario básico de colores" />
+        </Field>
         <Field label="Imagen de portada">
           <Input type="text" inputMode="url" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." />
         </Field>

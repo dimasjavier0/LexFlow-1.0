@@ -42,7 +42,7 @@ export async function listCollections(session: Session): Promise<AdminCollection
   return body.collections;
 }
 
-export async function createCollection(session: Session, input: { name: string; slug: string; imageUrl: string | null }): Promise<void> {
+export async function createCollection(session: Session, input: { name: string; slug: string; description: string | null; imageUrl: string | null }): Promise<void> {
   await apiRequest("/admin/collections", {
     method: "POST",
     session,
@@ -52,7 +52,7 @@ export async function createCollection(session: Session, input: { name: string; 
   });
 }
 
-export async function updateCollection(session: Session, collectionId: string, input: { name: string; imageUrl: string | null }): Promise<void> {
+export async function updateCollection(session: Session, collectionId: string, input: { name: string; description: string | null; imageUrl: string | null }): Promise<void> {
   await apiRequest(`/admin/collections/${collectionId}`, {
     method: "PATCH",
     session,

@@ -3,6 +3,7 @@ import { Alert, Button, Field, Input, Modal, Select } from "../../components/ui"
 import { useAsyncAction } from "../../hooks/use-async-action";
 import { createWordsBulk, type BulkWordsResult } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
+import { slugify } from "../../lib/slug";
 import { MAX_BULK_WORDS, parseBulkLines, type BulkLine } from "./parse-bulk-lines";
 import type { AdminLibrary } from "./use-admin-library";
 
@@ -26,7 +27,8 @@ export function BulkWordsModal({ library, onClose, onDone }: BulkWordsModalProps
   const collections = library.collections ?? [];
   const [collectionId, setCollectionId] = useState(collections[0]?.id ?? NEW_COLLECTION);
   const [collectionName, setCollectionName] = useState("");
-  const [collectionSlug, setCollectionSlug] = useState("");
+  const [customSlug, setCustomSlug] = useState<string | null>(null);
+  const collectionSlug = customSlug ?? slugify(collectionName);
   const [text, setText] = useState("");
   const save = useAsyncAction();
 
@@ -67,7 +69,7 @@ export function BulkWordsModal({ library, onClose, onDone }: BulkWordsModalProps
               <Input required maxLength={100} value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="Animals" />
             </Field>
             <Field label="Slug de la colección">
-              <Input required maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={collectionSlug} onChange={(event) => setCollectionSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-"))} placeholder="animals" />
+              <Input required maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={collectionSlug} onChange={(event) => setCustomSlug(event.target.value)} placeholder="animals" />
             </Field>
           </div>
         ) : null}
