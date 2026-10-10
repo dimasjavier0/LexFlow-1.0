@@ -1,9 +1,10 @@
 import { useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import { useAuth } from "../contexts/auth-context";
+import { useAuth } from "../../contexts/auth-context";
+import type { AdminWord } from "../../lib/admin-api";
 
 const apiUrl = import.meta.env.VITE_API_URL;
 type CollectionOption = { id: string; name: string };
-export type EditableWord = { id: string; term: string; translationEs: string; level: string; isPublished: boolean; images?: Array<{ id: string; url: string }>; audios?: Array<{ id: string; url: string; voice?: string | null; accent?: string | null; provider?: string | null }>; videos?: Array<{ id: string; url: string }> };
+export type EditableWord = AdminWord;
 
 type WordEditorProps = {
   word?: EditableWord;
@@ -115,7 +116,6 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => selectFile(event.target.files?.[0]);
 
   return <form className="admin-form word-editor" onSubmit={(event) => void submit(event)}>
-    <div className="editor-heading"><div><p className="eyebrow">{word ? "EDITAR PALABRA" : "NUEVA PALABRA"}</p><h3>{word ? word.term : "Crear palabra"}</h3></div><button className="modal-close" type="button" onClick={onCancel} aria-label="Cerrar">×</button></div>
     <div className="form-grid"><label>Palabra<input required value={term} onChange={(event) => setTerm(event.target.value)} placeholder="apple" /></label><label>Traducción<input required value={translation} onChange={(event) => setTranslation(event.target.value)} placeholder="manzana" /></label><label>Nivel<select value={level} onChange={(event) => setLevel(event.target.value)}>{["A1", "A2", "B1", "B2", "C1", "C2"].map((item) => <option key={item}>{item}</option>)}</select></label></div>
     {!word ? <label>Colección<select required value={collectionId} onChange={(event) => setCollectionId(event.target.value)}><option value="">Selecciona una colección</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label> : null}
     {associatedImages.length ? <div className="associated-media"><strong>Imágenes asociadas</strong><div className="associated-image-grid">{associatedImages.map((image) => <div className="associated-image-card" key={image.id}><img src={image.url} alt={`Imagen de ${word?.term ?? term}`} /><button className="associated-image-remove" type="button" onClick={() => void deleteImage(image.id)} aria-label={`Eliminar imagen ${image.url}`} title="Eliminar imagen">×</button><a href={image.url} target="_blank" rel="noreferrer">{image.url}</a></div>)}</div></div> : null}
