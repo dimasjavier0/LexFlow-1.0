@@ -7,10 +7,14 @@ type CollectionCardProps = {
   collection: ApiCollectionSummary;
   /** Level the learner is browsing; carried into the lesson. */
   level?: CefrLevel | null;
+  /** Words of this collection the learner has marked as learned; omit when signed out. */
+  learnedCount?: number;
 };
 
-export function CollectionCard({ collection, level = null }: CollectionCardProps) {
+export function CollectionCard({ collection, level = null, learnedCount }: CollectionCardProps) {
   const wordCount = collection._count.words;
+  const learned = Math.min(learnedCount ?? 0, wordCount);
+  const action = wordCount > 0 && learned === wordCount ? "Repasar" : learned > 0 ? "Continuar" : "Comenzar";
 
   return (
     <Link
@@ -30,10 +34,17 @@ export function CollectionCard({ collection, level = null }: CollectionCardProps
         <h2 className="mt-1.5 text-2xl font-bold tracking-tight">{collection.name}</h2>
         <p className="mt-2 line-clamp-2 text-sm leading-snug text-muted">{collection.description ?? "Colección de vocabulario"}</p>
       </div>
-      <span className="flex justify-between self-end text-xs font-bold text-muted">
-        {wordCount} {wordCount === 1 ? "palabra" : "palabras"}
-        <span className="text-teal-dark">Comenzar</span>
-      </span>
+      <div className="grid gap-2 self-end">
+        {learnedCount !== undefined && wordCount > 0 ? (
+          <div className="h-1.5 overflow-hidden rounded-full bg-line" role="progressbar" aria-label={`Palabras aprendidas de ${collection.name}`} aria-valuemin={0} aria-valuemax={wordCount} aria-valuenow={learned}>
+            <span className="block h-full rounded-full bg-teal" style={{ width: `${(learned / wordCount) * 100}%` }} />
+          </div>
+        ) : null}
+        <span className="flex justify-between text-xs font-bold text-muted">
+          {learnedCount !== undefined && wordCount > 0 ? `${learned} de ${wordCount} aprendidas` : `${wordCount} ${wordCount === 1 ? "palabra" : "palabras"}`}
+          <span className="text-teal-dark">{action}</span>
+        </span>
+      </div>
     </Link>
   );
 }

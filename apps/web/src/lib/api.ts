@@ -131,3 +131,9 @@ export async function getProgress(session: Session): Promise<Record<string, Lear
   const body = await apiRequest<{ progress: Array<{ wordId: string; status: LearningStatus }> }>("/progress", { session, errorMessage: "No se pudo cargar tu progreso." });
   return Object.fromEntries(body.progress.map((item) => [item.wordId, item.status]));
 }
+
+/** Number of learned words per collection id. */
+export async function getProgressSummary(session: Session, level: CefrLevel | null = null): Promise<Record<string, number>> {
+  const body = await apiRequest<{ summary: Array<{ collectionId: string; learned: number }> }>(`/progress/summary${levelQuery(level)}`, { session, errorMessage: "No se pudo cargar tu progreso." });
+  return Object.fromEntries(body.summary.map((item) => [item.collectionId, item.learned]));
+}

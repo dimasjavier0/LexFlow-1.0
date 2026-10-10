@@ -4,7 +4,7 @@ import { Alert, Button, EmptyState, Eyebrow, FilterChips } from "../components/u
 import { useAuth } from "../contexts/auth-context";
 import { errorMessage } from "../hooks/use-async-action";
 import { AppLayout } from "../layouts/app-layout";
-import { getCollections, type CollectionCatalog } from "../lib/api";
+import { getCollections, getProgressSummary, type CollectionCatalog } from "../lib/api";
 import { isCefrLevel, type CefrLevel } from "../lib/levels";
 
 const LEVEL_STORAGE_KEY = "lexflow.level";
@@ -29,11 +29,12 @@ function storeLevel(level: CefrLevel | null): void {
 }
 
 export function HomePage() {
-  const { apiUser } = useAuth();
+  const { apiUser, session } = useAuth();
   const [level, setLevel] = useState<CefrLevel | null>(readStoredLevel);
   const [catalog, setCatalog] = useState<CollectionCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [learnedByCollection, setLearnedByCollection] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -49,6 +50,23 @@ export function HomePage() {
       isCurrent = false;
     };
   }, [level, reloadKey]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (!session) {
+      setLearnedByCollection(null);
+      return;
+    }
+    // Optional decoration: without it the cards simply show their word count.
+    getProgressSummary(session, level)
+      .then((summary) => {
+        if (isCurrent) setLearnedByCollection(summary);
+      })
+      .catch(() => undefined);
+    return () => {
+      isCurrent = false;
+    };
+  }, [level, session]);
 
   const chooseLevel = useCallback((value: string) => {
     const next = isCefrLevel(value) ? value : null;
@@ -78,7 +96,7 @@ export function HomePage() {
       {loadError ? <Alert className="mb-6" action={<Button variant="secondary" size="sm" onClick={() => setReloadKey((key) => key + 1)}>Reintentar</Button>}>{loadError}</Alert> : null}
       <section className="grid gap-4.5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Colecciones de vocabulario" aria-busy={isLoading}>
         {isLoading ? [0, 1, 2].map((item) => <CollectionCardSkeleton key={item} />) : null}
-        {collections?.map((collection) => <CollectionCard key={collection.id} collection={collection} level={level} />)}
+        {collections?.map((collection) => <CollectionCard key={collection.id} collection={collection} level={level} learnedCount={learnedByCollection ? (learnedByCollection[collection.id] ?? 0) : undefined} />)}
       </section>
       {collections?.length === 0 ? (
         level ? (

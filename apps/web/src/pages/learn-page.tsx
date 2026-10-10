@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CarouselControls, MediaCarousel } from "../components/media-carousel";
 import { StatusPage } from "../components/status-page";
@@ -15,6 +15,9 @@ const STATUS_ACTIONS: Array<{ status: LearningStatus; icon: string; className: s
   { status: "NOT_INTERESTED", icon: "–", className: "bg-line/60 text-muted" },
   { status: "LEARNED", icon: "✓", className: "bg-teal-soft text-teal-dark" },
 ];
+
+/** Statuses that mean "do not show me this word again" when a lesson starts. */
+const KNOWN_STATUSES: ReadonlyArray<LearningStatus | undefined> = ["LEARNED", "NOT_INTERESTED"];
 
 const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogv|mov)(\?|#|$)/i;
 
@@ -34,11 +37,20 @@ export function LearnPage() {
   const [isTranslationVisible, setIsTranslationVisible] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [videoIndex, setVideoIndex] = useState(0);
-  const [progress, setProgress] = useState<Record<string, LearningStatus>>({});
+  // null until the saved progress has been fetched (or has failed to).
+  const [savedProgress, setSavedProgress] = useState<Record<string, LearningStatus> | null>(null);
+  // Words already known when the lesson started. A snapshot, so marking a word
+  // mid-lesson does not reshuffle the list under the learner.
+  const [knownIds, setKnownIds] = useState<Set<string> | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const save = useAsyncAction();
   const { clearError: clearSaveError } = save;
 
-  const wordCount = collection?.words.length ?? 0;
+  const sessionWords = useMemo(() => {
+    if (!collection) return [];
+    return showAll || !knownIds ? collection.words : collection.words.filter(({ word }) => !knownIds.has(word.id));
+  }, [collection, knownIds, showAll]);
+  const wordCount = sessionWords.length;
 
   const showWord = useCallback((index: number) => {
     setWordIndex(index);
@@ -52,6 +64,8 @@ export function LearnPage() {
   useEffect(() => {
     let isCurrent = true;
     setCollection(null);
+    setKnownIds(null);
+    setShowAll(false);
     setLoadError(null);
     showWord(0);
     getCollection(collectionSlug, level)
@@ -67,9 +81,16 @@ export function LearnPage() {
   }, [collectionSlug, level, reloadKey, showWord]);
 
   useEffect(() => {
-    if (!session) return;
-    void getProgress(session).then(setProgress).catch(() => undefined);
+    // Progress is a nicety: if it cannot be loaded the lesson still starts, with every word.
+    const fallBackToEmpty = () => setSavedProgress((current) => current ?? {});
+    if (!session) fallBackToEmpty();
+    else void getProgress(session).then(setSavedProgress).catch(fallBackToEmpty);
   }, [session]);
+
+  useEffect(() => {
+    if (!collection || !savedProgress || knownIds) return;
+    setKnownIds(new Set(collection.words.filter(({ word }) => KNOWN_STATUSES.includes(savedProgress[word.id])).map(({ word }) => word.id)));
+  }, [collection, knownIds, savedProgress]);
 
   const moveWord = useCallback((direction: -1 | 1) => {
     const nextIndex = wordIndex + direction;
@@ -97,27 +118,34 @@ export function LearnPage() {
   }, [isFinished, moveWord, wordCount]);
 
   if (loadError) return <StatusPage action={<div className="flex flex-wrap justify-center gap-2"><Button onClick={() => setReloadKey((key) => key + 1)}>Reintentar</Button>{backLink}</div>}>{loadError}</StatusPage>;
-  if (!collection) return <StatusPage isLoading>Cargando colección...</StatusPage>;
+  if (!collection || !knownIds || !savedProgress) return <StatusPage isLoading>Cargando colección...</StatusPage>;
+  if (!collection.words.length) return <StatusPage action={backLink}>{level ? `Esta colección no tiene palabras de nivel ${level}.` : "Esta colección aún no tiene palabras publicadas."}</StatusPage>;
 
-  const currentWord = collection.words[wordIndex]?.word;
-  if (!currentWord) return <StatusPage action={backLink}>{level ? `Esta colección no tiene palabras de nivel ${level}.` : "Esta colección aún no tiene palabras publicadas."}</StatusPage>;
+  const progress = savedProgress;
+  const reviewAll = () => {
+    setShowAll(true);
+    showWord(0);
+  };
+  const currentWord = sessionWords[wordIndex]?.word;
+  // Every word was already known when the lesson started: go straight to the summary.
+  const isSummary = isFinished || !currentWord;
 
   const topbar = (
     <header className="flex items-center justify-between gap-4">
       <Link className="text-sm font-extrabold text-teal-dark no-underline hover:underline" to="/">← Volver</Link>
-      <span className="text-xs font-bold text-muted">{isFinished ? "Completada" : `${wordIndex + 1} / ${wordCount}`}</span>
-      <Badge>{currentWord.level}</Badge>
+      <span className="text-xs font-bold text-muted">{isSummary ? "Completada" : `${wordIndex + 1} / ${wordCount}`}</span>
+      {currentWord && !isSummary ? <Badge>{currentWord.level}</Badge> : <span aria-hidden="true" />}
     </header>
   );
 
-  if (isFinished) {
+  if (isSummary || !currentWord) {
     const statuses = collection.words.map(({ word }) => progress[word.id]);
     return (
       <AppLayout width="narrow" topbar={topbar}>
         <section className="mt-14 grid justify-items-center gap-5 rounded-3xl border border-line bg-surface p-6 text-center shadow-lift sm:p-10">
           <Eyebrow>{collection.name}</Eyebrow>
-          <h1 className="m-0 text-4xl font-bold tracking-tighter sm:text-5xl">¡Colección completada!</h1>
-          <p className="m-0 max-w-sm text-muted">Has recorrido las {wordCount} palabras. Este es tu progreso guardado:</p>
+          <h1 className="m-0 text-4xl font-bold tracking-tighter sm:text-5xl">{wordCount ? "¡Colección completada!" : "Ya conoces esta colección"}</h1>
+          <p className="m-0 max-w-sm text-muted">{wordCount ? `Has recorrido ${wordCount === 1 ? "la palabra pendiente" : `las ${wordCount} palabras`}.` : "No te queda ninguna palabra pendiente."} Este es tu progreso guardado:</p>
           <dl className="m-0 grid w-full max-w-md grid-cols-3 gap-2">
             {STATUS_ACTIONS.map((action) => (
               <div key={action.status} className={cn("rounded-2xl px-2 py-4", action.className)}>
@@ -127,7 +155,7 @@ export function LearnPage() {
             ))}
           </dl>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={() => showWord(0)}>Repasar de nuevo</Button>
+            <Button onClick={reviewAll}>Repasar todas</Button>
             {backLink}
           </div>
         </section>
@@ -139,7 +167,7 @@ export function LearnPage() {
     if (!session || save.isPending) return;
     void save.run(async () => {
       await updateProgress(session, currentWord.id, status);
-      setProgress((current) => ({ ...current, [currentWord.id]: status }));
+      setSavedProgress((current) => ({ ...current, [currentWord.id]: status }));
       moveWord(1);
     }, "No se pudo guardar tu progreso.");
   };
@@ -204,6 +232,14 @@ export function LearnPage() {
             </button>
           ))}
         </div>
+        {knownIds.size ? (
+          <p className="mt-5 mb-0 flex flex-wrap items-center justify-center gap-x-2 text-center text-xs text-muted">
+            {showAll ? "Estás repasando todas las palabras." : `${knownIds.size} ${knownIds.size === 1 ? "palabra que ya conoces está oculta" : "palabras que ya conoces están ocultas"}.`}
+            <button type="button" className="cursor-pointer font-extrabold text-teal-dark hover:underline" onClick={() => { setShowAll(!showAll); showWord(0); }}>
+              {showAll ? "Ocultar las que ya conozco" : "Mostrar todas"}
+            </button>
+          </p>
+        ) : null}
         <p className="mt-4 mb-0 hidden text-center text-[0.7rem] text-muted sm:block">Atajos: ← → cambian de palabra · Espacio muestra la traducción</p>
       </section>
     </AppLayout>
