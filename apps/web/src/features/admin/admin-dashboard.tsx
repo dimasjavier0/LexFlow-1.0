@@ -17,11 +17,17 @@ const QUICK_ACTIONS: Array<{ modal: NonNullable<ModalState>; icon: string; title
   { modal: { type: "collection" }, icon: "▦", title: "Nueva colección", description: "Prepara una nueva unidad de vocabulario." },
 ];
 
-function bulkSummary(result: BulkWordsResult): string {
-  const added = `${result.words.length} ${result.words.length === 1 ? "palabra añadida" : "palabras añadidas"}`;
-  const skipped = result.skipped ? `; ${result.skipped} ya estaban en la colección` : "";
-  const failedAudio = result.failedAudio ? `; ${result.failedAudio} sin pronunciación` : "";
-  return `${added}${skipped}${failedAudio}.`;
+function bulkSummary(results: BulkWordsResult[]): string {
+  const total = (pick: (result: BulkWordsResult) => number) => results.reduce((sum, result) => sum + pick(result), 0);
+  const addedCount = total((result) => result.words.length);
+  const skippedCount = total((result) => result.skipped);
+  const failedAudioCount = total((result) => result.failedAudio);
+  const createdCount = results.filter((result) => result.collectionCreated).length;
+  const added = `${addedCount} ${addedCount === 1 ? "palabra añadida" : "palabras añadidas"}${results.length > 1 ? ` en ${results.length} listas` : ""}`;
+  const created = createdCount ? `; ${createdCount} ${createdCount === 1 ? "colección nueva" : "colecciones nuevas"}` : "";
+  const skipped = skippedCount ? `; ${skippedCount} repetidas omitidas` : "";
+  const failedAudio = failedAudioCount ? `; ${failedAudioCount} sin pronunciación` : "";
+  return `${added}${created}${skipped}${failedAudio}.`;
 }
 
 export function AdminDashboard() {
@@ -110,9 +116,14 @@ export function AdminDashboard() {
         <BulkWordsModal
           library={library}
           onClose={closeModal}
-          onDone={(result) => {
+          onListDone={(result) => {
             upsertWords(result.collectionId, result.words);
-            showAddedWords(result.collectionId, bulkSummary(result));
+            setExpanded((current) => ({ ...current, [result.collectionId]: true }));
+            void reloadCollections();
+          }}
+          onDone={(results) => {
+            closeModal();
+            notify(bulkSummary(results));
           }}
         />
       ) : null}

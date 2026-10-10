@@ -52,7 +52,7 @@ export type MissingMediaPreview = {
   audio: { url: string; provider: string; voice: string; accent: string; metadata: Record<string, unknown> } | null;
 };
 
-export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; collectionId: string };
+export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; collectionId: string; collectionCreated: boolean };
 
 const INVALID_DATA = "Revisa los datos del formulario.";
 
