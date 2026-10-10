@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { CarouselControls, MediaCarousel } from "../components/media-carousel";
+import { ImageGrid } from "../components/image-grid";
+import { CarouselControls } from "../components/media-carousel";
 import { StatusPage } from "../components/status-page";
+import { WordAudio } from "../components/word-audio";
 import { Alert, Badge, Button, buttonClasses, Eyebrow, IconButton } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
 import { errorMessage, useAsyncAction } from "../hooks/use-async-action";
@@ -38,7 +40,6 @@ export function LearnPage() {
   const [wordIndex, setWordIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [isTranslationVisible, setIsTranslationVisible] = useState(false);
-  const [imageIndex, setImageIndex] = useState(0);
   const [videoIndex, setVideoIndex] = useState(0);
   // null until the saved progress has been fetched (or has failed to).
   const [savedProgress, setSavedProgress] = useState<Record<string, LearningStatus> | null>(null);
@@ -59,7 +60,6 @@ export function LearnPage() {
     setWordIndex(index);
     setIsFinished(false);
     setIsTranslationVisible(false);
-    setImageIndex(0);
     setVideoIndex(0);
     clearSaveError();
   }, [clearSaveError]);
@@ -185,8 +185,8 @@ export function LearnPage() {
   const currentVideo = currentWord.videos[Math.min(videoIndex, currentWord.videos.length - 1)];
 
   return (
-    <AppLayout width="narrow" topbar={topbar}>
-      <div className="mt-12 mb-7 text-center sm:mt-16">
+    <AppLayout width="split" topbar={topbar}>
+      <div className="mt-12 mb-7 text-center sm:mt-16 lg:mt-10">
         <Eyebrow>{collection.name}{level ? ` · Nivel ${level}` : ""}</Eyebrow>
         <h1 className="mt-2.5 mb-5 text-[clamp(2.6rem,8vw,4.8rem)] leading-[0.95] font-bold tracking-tighter break-words">{currentWord.term}</h1>
         {currentWord.partOfSpeech ? <p className="-mt-2 mb-4 text-sm text-muted italic">{PART_OF_SPEECH_LABELS[currentWord.partOfSpeech].toLowerCase()}</p> : null}
@@ -194,12 +194,14 @@ export function LearnPage() {
           <span className="block h-full rounded-full bg-teal transition-[width] duration-200" style={{ width: `${((wordIndex + 1) / wordCount) * 100}%` }} />
         </div>
       </div>
-      <section className="rounded-3xl border border-line bg-surface p-4 shadow-lift sm:p-7">
-        <MediaCarousel items={currentWord.images} index={imageIndex} onChange={setImageIndex} alt={currentWord.term} />
-        <div className="my-4 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+      {/* Desktop: image on the left, everything to act on beside it, so the lesson fits without scrolling. */}
+      <section className="rounded-3xl border border-line bg-surface p-4 shadow-lift sm:p-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+        <ImageGrid items={currentWord.images} alt={currentWord.term} />
+        <div>
+        <div className="my-4 grid grid-cols-[auto_1fr_auto] items-center gap-3 lg:mt-0">
           <IconButton label="Palabra anterior" disabled={wordIndex === 0} onClick={() => moveWord(-1)}>←</IconButton>
           <div className="flex min-w-0 justify-center">
-            {currentWord.audios[0] ? <audio className="h-10 w-full max-w-sm" controls src={currentWord.audios[0].url} aria-label={`Pronunciación de ${currentWord.term}`} /> : <span className="text-xs text-muted">Audio no disponible</span>}
+            <WordAudio key={currentWord.id} audios={currentWord.audios} label={`Pronunciación de ${currentWord.term}`} />
           </div>
           <IconButton label={wordIndex === wordCount - 1 ? "Terminar colección" : "Palabra siguiente"} onClick={() => moveWord(1)}>→</IconButton>
         </div>
@@ -236,7 +238,7 @@ export function LearnPage() {
         {currentVideo ? (
           <div className="mt-4 grid gap-1 text-center">
             {VIDEO_FILE_PATTERN.test(currentVideo.url) ? (
-              <video key={currentVideo.id} className="aspect-video w-full rounded-2xl bg-ink" controls preload="metadata" src={currentVideo.url} aria-label={`Video de ${currentWord.term}`} />
+              <video key={currentVideo.id} className="aspect-video w-full rounded-2xl bg-black" controls preload="metadata" src={currentVideo.url} aria-label={`Video de ${currentWord.term}`} />
             ) : (
               <a className="text-sm font-extrabold text-teal-dark no-underline hover:underline" href={currentVideo.url} target="_blank" rel="noreferrer">Ver contexto en video ↗</a>
             )}
@@ -272,6 +274,7 @@ export function LearnPage() {
           </p>
         ) : null}
         <p className="mt-4 mb-0 hidden text-center text-[0.7rem] text-muted sm:block">Atajos: ← → cambian de palabra · Espacio muestra la traducción</p>
+        </div>
       </section>
     </AppLayout>
   );

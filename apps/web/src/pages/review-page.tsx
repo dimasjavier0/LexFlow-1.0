@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BrandMark } from "../components/brand-mark";
-import { MediaCarousel } from "../components/media-carousel";
+import { ImageGrid } from "../components/image-grid";
 import { StatusPage } from "../components/status-page";
+import { WordAudio } from "../components/word-audio";
 import { Alert, Badge, Button, buttonClasses, Eyebrow, Input } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
 import { errorMessage, useAsyncAction } from "../hooks/use-async-action";
@@ -32,7 +33,6 @@ export function ReviewPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [imageIndex, setImageIndex] = useState(0);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [answered, setAnswered] = useState<Answered | null>(null);
   const [results, setResults] = useState<Answered[]>([]);
@@ -154,24 +154,22 @@ export function ReviewPage() {
   const goNext = () => {
     setIndex((current) => current + 1);
     setAnswer("");
-    setImageIndex(0);
     setIsHintVisible(false);
     setAnswered(null);
     check.clearError();
   };
 
   return (
-    <AppLayout width="narrow" topbar={topbar}>
+    <AppLayout width="split" topbar={topbar}>
       <div className="mt-10 mb-6 text-center">
         <Eyebrow>Repaso espaciado</Eyebrow>
         <h1 className="mt-2 mb-0 text-3xl font-bold tracking-tight sm:text-4xl">{answered ? word.term : "¿Qué palabra es?"}</h1>
       </div>
-      <section className="grid gap-4 rounded-3xl border border-line bg-surface p-4 shadow-lift sm:p-7">
-        <MediaCarousel items={word.images} index={imageIndex} onChange={setImageIndex} alt={answered ? word.term : "Imagen de la palabra"} />
+      <section className="grid gap-4 rounded-3xl border border-line bg-surface p-4 shadow-lift sm:p-7 lg:grid-cols-2 lg:items-start lg:gap-8">
+        <ImageGrid items={word.images} alt={answered ? word.term : "Imagen de la palabra"} />
+        <div className="grid gap-4">
         <div className="flex justify-center">
-          {word.audios[0] ? (
-            <audio key={word.id} className="h-10 w-full max-w-sm" controls autoPlay src={word.audios[0].url} aria-label="Pronunciación de la palabra" />
-          ) : <span className="text-xs text-muted">Audio no disponible</span>}
+          <WordAudio key={word.id} audios={word.audios} label="Pronunciación de la palabra" />
         </div>
 
         {answered ? (
@@ -216,6 +214,7 @@ export function ReviewPage() {
         <div className="flex justify-center gap-2">
           <Badge tone="neutral">{word.level}</Badge>
           <Badge tone={item.stage === "MASTERED" ? "teal" : "neutral"}>{item.stage === "NEW" ? "Nueva" : item.stage === "MASTERED" ? "Dominada" : "Aprendiendo"}</Badge>
+        </div>
         </div>
       </section>
     </AppLayout>
