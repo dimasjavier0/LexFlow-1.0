@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ImageGrid } from "../components/image-grid";
 import { CarouselControls } from "../components/media-carousel";
 import { StatusPage } from "../components/status-page";
+import { VideoPlayer } from "../components/video-player";
 import { WordAudio } from "../components/word-audio";
 import { Alert, Badge, Button, buttonClasses, Eyebrow, IconButton } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
@@ -21,8 +22,6 @@ const STATUS_ACTIONS: Array<{ status: LearningStatus; icon: string; className: s
 
 /** Statuses that mean "do not show me this word again" when a lesson starts. */
 const KNOWN_STATUSES: ReadonlyArray<LearningStatus | undefined> = ["LEARNED", "NOT_INTERESTED"];
-
-const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogv|mov)(\?|#|$)/i;
 
 const backLink = <Link className={buttonClasses({ variant: "secondary" })} to="/">Volver a colecciones</Link>;
 
@@ -201,7 +200,7 @@ export function LearnPage() {
         <div className="my-4 grid grid-cols-[auto_1fr_auto] items-center gap-3 lg:mt-0">
           <IconButton label="Palabra anterior" disabled={wordIndex === 0} onClick={() => moveWord(-1)}>←</IconButton>
           <div className="flex min-w-0 justify-center">
-            <WordAudio key={currentWord.id} audios={currentWord.audios} label={`Pronunciación de ${currentWord.term}`} />
+            <WordAudio key={currentWord.id} audios={currentWord.audios} term={currentWord.term} label={`Pronunciación de ${currentWord.term}`} />
           </div>
           <IconButton label={wordIndex === wordCount - 1 ? "Terminar colección" : "Palabra siguiente"} onClick={() => moveWord(1)}>→</IconButton>
         </div>
@@ -237,11 +236,7 @@ export function LearnPage() {
         ) : null}
         {currentVideo ? (
           <div className="mt-4 grid gap-1 text-center">
-            {VIDEO_FILE_PATTERN.test(currentVideo.url) ? (
-              <video key={currentVideo.id} className="aspect-video w-full rounded-2xl bg-black" controls preload="metadata" src={currentVideo.url} aria-label={`Video de ${currentWord.term}`} />
-            ) : (
-              <a className="text-sm font-extrabold text-teal-dark no-underline hover:underline" href={currentVideo.url} target="_blank" rel="noreferrer">Ver contexto en video ↗</a>
-            )}
+            <VideoPlayer key={currentVideo.id} video={currentVideo} term={currentWord.term} className="rounded-2xl" />
             <CarouselControls index={videoIndex} count={currentWord.videos.length} onChange={setVideoIndex} label="Video" />
           </div>
         ) : null}

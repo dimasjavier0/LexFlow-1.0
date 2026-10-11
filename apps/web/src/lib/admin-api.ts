@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { apiRequest } from "./api";
+import { VIDEO_SOURCES, type VideoSourceId, type WordVideo } from "./video-sources";
 import type { ExampleSentence, PartOfSpeech, WordRelationshipType } from "./word-details";
 
 export type AdminCollection = {
@@ -38,7 +39,7 @@ export type AdminWord = {
   relationsFrom: AdminWordRelation[];
   images: Array<{ id: string; url: string }>;
   audios: AdminAudio[];
-  videos: Array<{ id: string; url: string }>;
+  videos: Array<WordVideo & { id: string }>;
 };
 
 export type NewWordImage = { url: string; source: "pixabay" | "manual"; attribution?: string; metadata?: Record<string, unknown> };
@@ -50,6 +51,18 @@ export type MissingMediaPreview = {
   term: string;
   images: Array<{ url: string; attribution: string; metadata: Record<string, unknown> }>;
   audio: { url: string; provider: string; voice: string; accent: string; metadata: Record<string, unknown> } | null;
+};
+
+/** A sound that is not stored yet: a recording found by the API or a link pasted by the admin. */
+export type NewWordAudio = { url: string; provider?: string; accent?: string | null; metadata?: Record<string, unknown> };
+
+/** A video that is not stored yet: one found by a search, YouGlish for the word, or a pasted link. */
+export type NewWordVideo = Omit<WordVideo, "id"> & { license?: string | null };
+
+/** A search result, as the API describes it. */
+export type VideoCandidate = NewWordVideo & {
+  provider: string;
+  metadata: { kind: "file" | "embed"; externalId: string; thumbnailUrl: string | null; duration: number | null; title: string | null; pageUrl: string };
 };
 
 export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; collectionId: string; collectionCreated: boolean };
@@ -138,6 +151,25 @@ export async function searchImages(session: Session, query: string, page: number
   return body.images;
 }
 
+/** Looks for human recordings of the term, with the preferred accent first. */
+export async function searchRecordedAudios(session: Session, term: string, accent: "US" | "UK"): Promise<NewWordAudio[]> {
+  const params = new URLSearchParams({ term, accent });
+  const body = await apiRequest<{ audios: NewWordAudio[] }>(`/admin/audio/recorded?${params.toString()}`, { session, errorMessage: "No se pudo buscar el sonido." });
+  return body.audios;
+}
+
+/** Attaches a previewed sound to a word. Only its link is stored. */
+export async function addWordAudio(session: Session, wordId: string, audio: NewWordAudio): Promise<AdminAudio> {
+  const body = await apiRequest<{ resource: AdminAudio }>(`/admin/words/${wordId}/media`, {
+    method: "POST",
+    session,
+    body: { type: "audio", url: audio.url, provider: audio.provider, accent: audio.accent ?? undefined, metadata: audio.metadata },
+    errorMessage: "No se pudo guardar el sonido.",
+    statusMessages: { 400: "El enlace del sonido no es válido." },
+  });
+  return body.resource;
+}
+
 export async function updateWord(
   session: Session,
   wordId: string,
@@ -165,14 +197,37 @@ export async function uploadWordImage(session: Session, wordId: string, file: Fi
   return body.image;
 }
 
-/** Attaches an external video or audio to a word by URL. */
-export async function addWordMedia(session: Session, wordId: string, type: "video" | "audio", url: string): Promise<AdminAudio> {
-  const body = await apiRequest<{ resource: AdminAudio }>(`/admin/words/${wordId}/media`, {
+/** Videos about the term from one source. YouGlish is not searched here: its player fetches the clips itself. */
+export async function searchVideos(session: Session, source: Exclude<VideoSourceId, "youglish">, term: string): Promise<VideoCandidate[]> {
+  const params = new URLSearchParams({ term, source });
+  const envVar = VIDEO_SOURCES.find((item) => item.value === source)?.envVar;
+  const body = await apiRequest<{ videos: VideoCandidate[] }>(`/admin/videos/search?${params.toString()}`, {
+    session,
+    errorMessage: "No se pudieron buscar videos.",
+    statusMessages: {
+      502: "La fuente no respondió. Inténtalo de nuevo.",
+      503: `Esta fuente no está configurada: añade ${envVar ?? "su clave"} al .env del servidor y reinícialo.`,
+    },
+  });
+  return body.videos;
+}
+
+/** Attaches a previewed video to a word. Only its link is stored. */
+export async function addWordVideo(session: Session, wordId: string, video: NewWordVideo): Promise<AdminWord["videos"][number]> {
+  const body = await apiRequest<{ resource: AdminWord["videos"][number] }>(`/admin/words/${wordId}/media`, {
     method: "POST",
     session,
-    body: { type, url },
-    errorMessage: `La palabra se guardó, pero el ${type === "video" ? "video" : "audio"} no pudo asociarse.`,
-    statusMessages: { 400: `La palabra se guardó, pero la URL del ${type === "video" ? "video" : "audio"} no es válida.` },
+    body: {
+      type: "video",
+      url: video.url,
+      source: video.provider && video.provider !== "manual" ? "search" : "manual",
+      provider: video.provider ?? undefined,
+      license: video.license ?? undefined,
+      attribution: video.attribution?.slice(0, 300) ?? undefined,
+      metadata: video.metadata ?? undefined,
+    },
+    errorMessage: "No se pudo guardar el video.",
+    statusMessages: { 400: "El enlace del video no es válido." },
   });
   return body.resource;
 }

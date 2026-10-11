@@ -4,7 +4,8 @@ import type { Session } from "@supabase/supabase-js";
 import { useAuth } from "../../contexts/auth-context";
 import { errorMessage, useAsyncAction } from "../../hooks/use-async-action";
 import {
-  addWordMedia,
+  addWordAudio,
+  addWordVideo,
   createWord,
   deleteWordAudio,
   deleteWordImage,
@@ -13,11 +14,16 @@ import {
   updateWord,
   uploadWordImage,
   type AdminWord,
+  type NewWordAudio,
+  type NewWordVideo,
 } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
 import { CEFR_LEVELS } from "../../lib/levels";
+import type { WordVideo } from "../../lib/video-sources";
 import { PART_OF_SPEECH_LABELS, type PartOfSpeech } from "../../lib/word-details";
 import { ImagePicker, type PickedImage } from "./image-picker";
+import { SoundField, type SoundItem } from "./sound-field";
+import { VideoField } from "./video-field";
 import { RelationList, SentenceList } from "./word-extras";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -64,12 +70,11 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   const [newImages, setNewImages] = useState<PickedImage[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState("");
-  const [audioUrl, setAudioUrl] = useState("");
+  // Sounds and videos picked before the word exists, stored right after it is created.
+  const [pendingSounds, setPendingSounds] = useState<NewWordAudio[]>([]);
+  const [pendingVideos, setPendingVideos] = useState<NewWordVideo[]>([]);
   const [isRemoving, setIsRemoving] = useState(false);
-  const [audioAccent, setAudioAccent] = useState<"US" | "UK">("US");
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const save = useAsyncAction();
 
   useEffect(() => {
@@ -82,6 +87,15 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     return () => URL.revokeObjectURL(objectUrl);
   }, [imageFile]);
 
+  /** Applies a change to the latest copy of the saved word and tells the parent list. */
+  const applyToPersisted = (apply: (current: AdminWord) => AdminWord) => {
+    const current = persistedRef.current;
+    if (!current) return;
+    const next = apply(current);
+    setPersisted(next);
+    onMediaChange?.(next);
+  };
+
   /**
    * Runs an immediate media request on the saved word and applies its result to
    * the latest copy of the word, reporting failures inline.
@@ -91,24 +105,63 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
     setMediaError(null);
     try {
       const result = await request(session);
-      const current = persistedRef.current;
-      if (!current) return;
-      const next = apply(current, result);
-      setPersisted(next);
-      onMediaChange?.(next);
+      applyToPersisted((current) => apply(current, result));
     } catch (error) {
       setMediaError(errorMessage(error, fallback));
     }
   };
 
-  const generateAudio = async (wordId: string) => {
-    setIsGeneratingAudio(true);
-    await mutateMedia(
-      (current) => generateWordAudio(current, wordId, audioAccent),
-      (current, audio) => ({ ...current, audios: [...current.audios, audio] }),
-      "No se pudo generar el audio.",
-    );
-    setIsGeneratingAudio(false);
+  // Sound and video actions: immediate for a saved word, remembered until creation otherwise.
+  // Failures reject so the field reports them next to the control that caused them.
+  const addSound = async (audio: NewWordAudio) => {
+    const current = persistedRef.current;
+    if (!current) {
+      setPendingSounds((pending) => [...pending, audio]);
+      return;
+    }
+    if (!session) return;
+    const saved = await addWordAudio(session, current.id, audio);
+    applyToPersisted((word) => ({ ...word, audios: [...word.audios, saved] }));
+  };
+
+  const removeSound = async (sound: SoundItem) => {
+    const { id } = sound;
+    if (!id) {
+      setPendingSounds((pending) => pending.filter((item) => item.url !== sound.url));
+      return;
+    }
+    if (!session) return;
+    await deleteWordAudio(session, id);
+    applyToPersisted((word) => ({ ...word, audios: word.audios.filter((item) => item.id !== id) }));
+  };
+
+  const generateSound = async (accent: "US" | "UK") => {
+    const current = persistedRef.current;
+    if (!session || !current) return;
+    const audio = await generateWordAudio(session, current.id, accent);
+    applyToPersisted((word) => ({ ...word, audios: [...word.audios, audio] }));
+  };
+
+  const addVideo = async (video: NewWordVideo) => {
+    const current = persistedRef.current;
+    if (!current) {
+      setPendingVideos((pending) => [...pending, video]);
+      return;
+    }
+    if (!session) return;
+    const saved = await addWordVideo(session, current.id, video);
+    applyToPersisted((word) => ({ ...word, videos: [...word.videos, saved] }));
+  };
+
+  const removeVideo = async (video: WordVideo) => {
+    const { id } = video;
+    if (!id) {
+      setPendingVideos((pending) => pending.filter((item) => item.url !== video.url));
+      return;
+    }
+    if (!session) return;
+    await deleteWordVideo(session, id);
+    applyToPersisted((word) => ({ ...word, videos: word.videos.filter((item) => item.id !== id) }));
   };
 
   const selectFile = (file: File | undefined) => {
@@ -144,17 +197,22 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
         setPersisted(current);
         setImageFile(null);
       }
-      if (videoUrl.trim()) {
-        const video = await addWordMedia(session, current.id, "video", videoUrl.trim());
-        current = { ...current, videos: [...current.videos, video] };
-        setPersisted(current);
-        setVideoUrl("");
+      for (const sound of pendingSounds) {
+        // A word reused from another collection may already have this sound.
+        if (!current.audios.some((audio) => audio.url === sound.url)) {
+          const audio = await addWordAudio(session, current.id, sound);
+          current = { ...current, audios: [...current.audios, audio] };
+          setPersisted(current);
+        }
+        setPendingSounds((pending) => pending.filter((item) => item.url !== sound.url));
       }
-      if (audioUrl.trim()) {
-        const audio = await addWordMedia(session, current.id, "audio", audioUrl.trim());
-        current = { ...current, audios: [...current.audios, audio] };
-        setPersisted(current);
-        setAudioUrl("");
+      for (const video of pendingVideos) {
+        if (!current.videos.some((item) => item.url === video.url)) {
+          const saved = await addWordVideo(session, current.id, video);
+          current = { ...current, videos: [...current.videos, saved] };
+          setPersisted(current);
+        }
+        setPendingVideos((pending) => pending.filter((item) => item.url !== video.url));
       }
       result = current;
     }, "No se pudo guardar la palabra.");
@@ -162,8 +220,6 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
   };
 
   const images = persisted?.images ?? [];
-  const audios = persisted?.audios ?? [];
-  const videos = persisted?.videos ?? [];
 
   return (
     <form className={cn("grid gap-4", className)} onSubmit={(event) => void submit(event)}>
@@ -234,43 +290,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
         </label>
       </Section>
 
-      <Section title="Sonido">
-        {persisted ? (
-          <>
-            {audios.length ? (
-              <ul className="m-0 grid list-none gap-2 p-0">
-                {audios.map((audio) => (
-                  <li key={audio.id} className="flex flex-wrap items-center gap-2">
-                    <audio className="h-9 min-w-0 flex-1" controls src={audio.url} aria-label={`Pronunciación de ${term}`} />
-                    <small className="text-xs text-muted">{audio.accent ?? "US"} · {audio.provider ?? "manual"}</small>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void mutateMedia(
-                        (current) => deleteWordAudio(current, audio.id),
-                        (current) => ({ ...current, audios: current.audios.filter((item) => item.id !== audio.id) }),
-                        "No se pudo eliminar el sonido.",
-                      )}
-                    >
-                      Eliminar
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="m-0 text-xs text-muted">No hay sonido guardado.</p>}
-            <div className="flex flex-wrap items-center gap-2">
-              <Select className="w-auto" aria-label="Acento" value={audioAccent} onChange={(event) => setAudioAccent(event.target.value as "US" | "UK")}>
-                <option value="US">Voz US</option>
-                <option value="UK">Voz UK</option>
-              </Select>
-              <Button variant="secondary" isLoading={isGeneratingAudio} loadingLabel="Generando..." onClick={() => void generateAudio(persisted.id)}>
-                {audios.length ? "Generar otro sonido" : "Generar sonido"}
-              </Button>
-            </div>
-          </>
-        ) : <p className="m-0 text-xs text-muted">Podrás generar la pronunciación después de guardar la palabra.</p>}
-        <Input type="url" aria-label="Enlace de audio" placeholder="…o pega el enlace de un audio (https://...)" value={audioUrl} onChange={(event) => setAudioUrl(event.target.value)} />
-      </Section>
+      <SoundField session={session} term={term} sounds={persisted?.audios ?? pendingSounds} onAdd={addSound} onRemove={removeSound} onGenerate={persisted ? generateSound : undefined} />
 
       <Section title="Oraciones de ejemplo">
         {persisted ? <SentenceList word={persisted} mutate={mutateMedia} /> : <p className="m-0 text-xs text-muted">Podrás añadir oraciones después de guardar la palabra.</p>}
@@ -280,27 +300,7 @@ export function WordEditor({ word, collections, initialCollectionId = "", onSave
         {persisted ? <RelationList word={persisted} mutate={mutateMedia} /> : <p className="m-0 text-xs text-muted">Podrás enlazar sinónimos y antónimos después de guardar la palabra.</p>}
       </Section>
 
-      <Section title="Videos">
-        {videos.length ? (
-          <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2.5 p-0">
-            {videos.map((video) => (
-              <li key={video.id} className="relative min-w-0">
-                <video className="aspect-video w-full rounded-lg bg-black" controls preload="metadata" src={video.url} aria-label={`Video de ${term}`} />
-                <a className="mt-1 block truncate text-[0.7rem] text-teal-dark" href={video.url} target="_blank" rel="noreferrer">{video.url}</a>
-                <RemoveButton
-                  label="Eliminar video"
-                  onClick={() => void mutateMedia(
-                    (current) => deleteWordVideo(current, video.id),
-                    (current) => ({ ...current, videos: current.videos.filter((item) => item.id !== video.id) }),
-                    "No se pudo eliminar el video.",
-                  )}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <Input type="url" aria-label="Enlace de video" placeholder="Pega el enlace de un video (https://...)" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} />
-      </Section>
+      <VideoField session={session} term={term} videos={persisted?.videos ?? pendingVideos} onAdd={addVideo} onRemove={removeVideo} />
 
       {mediaError ? <Alert>{mediaError}</Alert> : null}
       {save.error ? <Alert>{save.error}</Alert> : null}

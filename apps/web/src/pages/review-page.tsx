@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { BrandMark } from "../components/brand-mark";
 import { ImageGrid } from "../components/image-grid";
@@ -6,10 +6,12 @@ import { StatusPage } from "../components/status-page";
 import { WordAudio } from "../components/word-audio";
 import { Alert, Badge, Button, buttonClasses, Eyebrow, Input } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
+import { WordBuilder } from "../features/review/word-builder";
 import { errorMessage, useAsyncAction } from "../hooks/use-async-action";
 import { AppLayout } from "../layouts/app-layout";
-import { getDueReviews, submitReview, type ReviewItem, type ReviewOutcome, type ReviewResult } from "../lib/api";
+import { getDueReviews, submitReview, type ReviewItem, type ReviewLevel, type ReviewOutcome, type ReviewResult } from "../lib/api";
 import { cn } from "../lib/cn";
+import { blankCount, buildExercise, composeAnswer, REVIEW_LEVEL_COUNT, REVIEW_LEVEL_INFO } from "../lib/review-exercise";
 
 const SESSION_SIZE = 20;
 
@@ -25,6 +27,18 @@ function nextReviewLabel(intervalDays: number): string {
 
 type Answered = { result: ReviewResult; outcome: ReviewOutcome };
 
+/** Where the word stands on the way from "half of it is given" to "typed from memory". */
+function LevelSteps({ level }: { level: ReviewLevel }) {
+  return (
+    <p className="m-0 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-xs font-bold text-muted">
+      <span aria-hidden="true" className="flex gap-1">
+        {Array.from({ length: REVIEW_LEVEL_COUNT }, (_, step) => <span key={step} className={cn("h-1.5 w-5 rounded-full", step < level ? "bg-teal" : "bg-line")} />)}
+      </span>
+      Nivel {level} de {REVIEW_LEVEL_COUNT} · {REVIEW_LEVEL_INFO[level].name}
+    </p>
+  );
+}
+
 export function ReviewPage() {
   const { session } = useAuth();
   const [items, setItems] = useState<ReviewItem[] | null>(null);
@@ -33,6 +47,8 @@ export function ReviewPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState("");
+  // Letters placed in the word builder, as positions of its bank (levels below the last).
+  const [picked, setPicked] = useState<number[]>([]);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [answered, setAnswered] = useState<Answered | null>(null);
   const [results, setResults] = useState<Answered[]>([]);
@@ -66,6 +82,8 @@ export function ReviewPage() {
   }, [reloadKey]);
 
   const item = items?.[index];
+  // Shuffled once per word: `item` keeps its identity until the queue is loaded again.
+  const exercise = useMemo(() => (item && item.level < REVIEW_LEVEL_COUNT ? buildExercise(item.word.term, item.level as Exclude<ReviewLevel, 4>) : null), [item]);
 
   // Move focus with the flow so the whole review can be done from the keyboard.
   useEffect(() => {
@@ -143,17 +161,26 @@ export function ReviewPage() {
   const { word } = item;
   const sentence = word.sentences[0];
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!answer.trim()) return;
-    const isRight = normalize(answer) === normalize(word.term);
+  // Below the last level the answer is built from letter tiles instead of typed.
+  const attempt = exercise ? composeAnswer(exercise, picked) : answer;
+  const isAttemptComplete = exercise ? picked.length === blankCount(exercise) : Boolean(answer.trim());
+
+  const checkAttempt = () => {
+    if (!isAttemptComplete) return;
+    const isRight = normalize(attempt) === normalize(word.term);
     // Needing the translation to get there still counts, but as a weaker recall.
     grade(isRight ? (isHintVisible ? "hard" : "correct") : "incorrect");
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    checkAttempt();
   };
 
   const goNext = () => {
     setIndex((current) => current + 1);
     setAnswer("");
+    setPicked([]);
     setIsHintVisible(false);
     setAnswered(null);
     check.clearError();
@@ -169,7 +196,7 @@ export function ReviewPage() {
         <ImageGrid items={word.images} alt={answered ? word.term : "Imagen de la palabra"} />
         <div className="grid gap-4">
         <div className="flex justify-center">
-          <WordAudio key={word.id} audios={word.audios} label="Pronunciación de la palabra" />
+          <WordAudio key={word.id} audios={word.audios} term={word.term} label="Pronunciación de la palabra" />
         </div>
 
         {answered ? (
@@ -188,24 +215,29 @@ export function ReviewPage() {
           </>
         ) : (
           <form className="grid gap-3" onSubmit={submit}>
-            <Input
-              ref={inputRef}
-              aria-label="Escribe la palabra en inglés"
-              className="py-3.5 text-center text-xl font-bold"
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="Escribe la palabra en inglés"
-              value={answer}
-              onChange={(event) => setAnswer(event.target.value)}
-            />
+            <LevelSteps level={item.level} />
+            {exercise ? (
+              <WordBuilder exercise={exercise} picked={picked} onChange={setPicked} onSubmit={checkAttempt} disabled={check.isPending} />
+            ) : (
+              <Input
+                ref={inputRef}
+                aria-label="Escribe la palabra en inglés"
+                className="py-3.5 text-center text-xl font-bold"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Escribe la palabra en inglés"
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+              />
+            )}
             <p className={cn("m-0 rounded-xl bg-paper px-4 py-2.5 text-center text-sm", isHintVisible ? "font-bold text-ink" : "text-muted")}>
-              {isHintVisible ? word.translationEs : "Mira la imagen, escucha el audio y escribe lo que oyes."}
+              {isHintVisible ? word.translationEs : `Mira la imagen y escucha el audio. ${REVIEW_LEVEL_INFO[item.level].instruction}`}
             </p>
             {check.error ? <Alert>{check.error} Inténtalo de nuevo.</Alert> : null}
             <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-              <Button type="submit" disabled={!answer.trim()} isLoading={check.isPending} loadingLabel="Comprobando...">Comprobar</Button>
+              <Button type="submit" disabled={!isAttemptComplete} isLoading={check.isPending} loadingLabel="Comprobando...">Comprobar</Button>
               <Button variant="secondary" disabled={isHintVisible || check.isPending} onClick={() => setIsHintVisible(true)}>Ver pista</Button>
               <Button variant="ghost" disabled={check.isPending} onClick={() => grade("incorrect")}>No la sé</Button>
             </div>
