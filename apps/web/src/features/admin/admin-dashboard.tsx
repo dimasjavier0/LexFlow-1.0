@@ -2,7 +2,8 @@ import { useCallback, useState } from "react";
 import type { AlertTone, ToastMessage } from "../../components/ui";
 import { Alert, Button, EmptyState, Eyebrow, FilterChips, Modal, Spinner, Toast } from "../../components/ui";
 import { AdminLayout } from "../../layouts/admin-layout";
-import type { AdminCollection, BulkWordsResult } from "../../lib/admin-api";
+import { errorMessage } from "../../hooks/use-async-action";
+import { repairImages, type AdminCollection, type BulkWordsResult } from "../../lib/admin-api";
 import { BulkWordsModal } from "./bulk-words-modal";
 import { CollectionFormModal } from "./collection-form-modal";
 import { CollectionRow, WORD_FILTER_OPTIONS, type WordFilter } from "./collection-row";
@@ -32,16 +33,39 @@ function bulkSummary(results: BulkWordsResult[]): string {
 
 export function AdminDashboard() {
   const library = useAdminLibrary();
-  const { collections, loadError, reloadCollections, upsertWords } = library;
+  const { collections, loadError, reloadCollections, upsertWords, loadWords, wordsByCollection, session } = library;
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<ModalState>(null);
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [wordFilter, setWordFilter] = useState<WordFilter>("all");
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const notify = useCallback((text: string, tone: AlertTone = "success") => setToast({ text, tone }), []);
   const dismissToast = useCallback(() => setToast(null), []);
   const closeModal = () => setModal(null);
+
+  const repairAllImages = async () => {
+    if (!session) return;
+    setIsRepairing(true);
+    try {
+      const result = await repairImages(session);
+      // Covers and every word list already on screen may show repaired images.
+      await Promise.all([reloadCollections(), ...Object.keys(wordsByCollection).map((collectionId) => loadWords(collectionId))]);
+      if (!result.repaired && !result.failed) {
+        notify("No hay imágenes caducadas: todas están guardadas en el servidor.");
+        return;
+      }
+      const repaired = `${result.repaired} ${result.repaired === 1 ? "imagen reparada" : "imágenes reparadas"}`;
+      const failed = result.failed ? `; ${result.failed} no se pudieron recuperar` : "";
+      const remaining = result.remaining ? `; quedan ${result.remaining}, vuelve a pulsar en un minuto` : "";
+      notify(`${repaired}${failed}${remaining}.`, result.failed || result.remaining ? "info" : "success");
+    } catch (error) {
+      notify(errorMessage(error, "No se pudieron reparar las imágenes."), "error");
+    } finally {
+      setIsRepairing(false);
+    }
+  };
 
   const showAddedWords = (collectionId: string, message: string) => {
     setExpanded((current) => ({ ...current, [collectionId]: true }));
@@ -73,7 +97,10 @@ export function AdminDashboard() {
             <Eyebrow>Biblioteca</Eyebrow>
             <h2 id="library-heading" className="mt-1 text-2xl font-bold tracking-tight">Colecciones</h2>
           </div>
-          {collections ? <span className="text-sm text-muted">{collections.length} en total</span> : null}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {collections ? <span className="text-sm text-muted">{collections.length} en total</span> : null}
+            <Button variant="secondary" size="sm" title="Descarga al servidor las imágenes de Pixabay cuyo enlace caducó" isLoading={isRepairing} loadingLabel="Reparando imágenes..." onClick={() => void repairAllImages()}>Reparar imágenes</Button>
+          </div>
         </div>
         <FilterChips label="Filtrar palabras" options={WORD_FILTER_OPTIONS} value={wordFilter} onChange={setWordFilter} />
         {loadError ? <Alert action={<Button variant="secondary" size="sm" onClick={() => void reloadCollections()}>Reintentar</Button>}>{loadError}</Alert> : null}

@@ -68,6 +68,8 @@ export type VideoCandidate = NewWordVideo & {
 export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; collectionId: string; collectionCreated: boolean };
 
 const INVALID_DATA = "Revisa los datos del formulario.";
+const IMAGE_DOWNLOAD_FAILED = "No se pudieron descargar las imágenes de Pixabay. Búscalas de nuevo e inténtalo otra vez.";
+const COVER_DOWNLOAD_FAILED = "No se pudo descargar la imagen de Pixabay. Búscala de nuevo e inténtalo otra vez.";
 
 export async function listCollections(session: Session): Promise<AdminCollection[]> {
   const body = await apiRequest<{ collections: AdminCollection[] }>("/admin/collections", { session, errorMessage: "No se pudieron cargar las colecciones." });
@@ -80,7 +82,7 @@ export async function createCollection(session: Session, input: { name: string; 
     session,
     body: { ...input, isPublished: false },
     errorMessage: "No se pudo crear la colección.",
-    statusMessages: { 400: "Revisa el nombre, el slug (minúsculas, números y guiones) y la URL de la imagen.", 409: "Ya existe una colección con ese slug." },
+    statusMessages: { 400: "Revisa el nombre, el slug (minúsculas, números y guiones) y la URL de la imagen.", 409: "Ya existe una colección con ese slug.", 502: COVER_DOWNLOAD_FAILED },
   });
 }
 
@@ -90,7 +92,7 @@ export async function updateCollection(session: Session, collectionId: string, i
     session,
     body: input,
     errorMessage: "No se pudo actualizar la colección.",
-    statusMessages: { 400: "Revisa el nombre y la URL de la imagen." },
+    statusMessages: { 400: "Revisa el nombre y la URL de la imagen.", 502: COVER_DOWNLOAD_FAILED },
   });
 }
 
@@ -113,7 +115,7 @@ export async function createWord(
     session,
     body: { ...input, isPublished: false },
     errorMessage: "No se pudo crear la palabra.",
-    statusMessages: { 400: INVALID_DATA, 409: "Esa palabra ya está en la colección." },
+    statusMessages: { 400: INVALID_DATA, 409: "Esa palabra ya está en la colección.", 502: IMAGE_DOWNLOAD_FAILED },
   });
   return body.word.word;
 }
@@ -180,7 +182,7 @@ export async function updateWord(
     session,
     body: input,
     errorMessage: "No se pudo guardar la palabra.",
-    statusMessages: { 400: INVALID_DATA, 409: "Ya existe otra palabra con ese término." },
+    statusMessages: { 400: INVALID_DATA, 409: "Ya existe otra palabra con ese término.", 502: IMAGE_DOWNLOAD_FAILED },
   });
   return body.word;
 }
@@ -263,6 +265,29 @@ export async function setWordPublication(session: Session, wordId: string, isPub
 /** Publishes or unpublishes every word of a collection at once. */
 export async function setCollectionWordsPublication(session: Session, collectionId: string, isPublished: boolean): Promise<void> {
   await apiRequest(`/admin/collections/${collectionId}/words/publication`, { method: "PATCH", session, body: { isPublished }, errorMessage: "No se pudieron publicar las palabras." });
+}
+
+export type WordsAction = "publish" | "unpublish" | "repair-images" | "refresh-images" | "delete-images" | "remove";
+
+/** Applies one action to several words of a collection. `failed` counts what an image action could not complete. */
+export async function runWordsAction(session: Session, collectionId: string, wordIds: string[], action: WordsAction): Promise<{ affected: number; failed: number }> {
+  return apiRequest(`/admin/collections/${collectionId}/words/actions`, {
+    method: "POST",
+    session,
+    body: { wordIds, action },
+    errorMessage: "No se pudo aplicar la acción a las palabras seleccionadas.",
+    statusMessages: { 400: "Selecciona como máximo 200 palabras a la vez.", 503: "Pixabay no está configurado en el servidor." },
+  });
+}
+
+/** Downloads every image that still points at an expired Pixabay link. `remaining` is what is left for another run. */
+export async function repairImages(session: Session): Promise<{ repaired: number; failed: number; remaining: number }> {
+  return apiRequest("/admin/images/repair", {
+    method: "POST",
+    session,
+    errorMessage: "No se pudieron reparar las imágenes.",
+    statusMessages: { 503: "Pixabay no está configurado en el servidor." },
+  });
 }
 
 /** Deletes a collection, along with any word that belonged only to it. */

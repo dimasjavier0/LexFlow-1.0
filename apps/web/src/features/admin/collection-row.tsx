@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { AlertTone } from "../../components/ui";
 import { Alert, Button, EmptyState, Spinner, Switch } from "../../components/ui";
 import { errorMessage } from "../../hooks/use-async-action";
-import { removeWordFromCollection, setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord } from "../../lib/admin-api";
+import { removeWordFromCollection, runWordsAction, setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord, type WordsAction } from "../../lib/admin-api";
 import { MissingMediaPreview } from "./missing-media-preview";
 import { QuickWordForm } from "./quick-word-form";
 import type { AdminLibrary } from "./use-admin-library";
 import { WordEditor } from "./word-editor";
 import { WordRow } from "./word-row";
+import { WordSelectionBar } from "./word-selection-bar";
 
 export type WordFilter = "all" | "translation" | "images" | "audio";
 
@@ -23,6 +24,25 @@ function matchesFilter(word: AdminWord, filter: WordFilter): boolean {
   if (filter === "images") return word.images.length === 0;
   if (filter === "audio") return word.audios.length === 0;
   return true;
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** What to tell the admin once a bulk action has finished. */
+function actionSummary(action: WordsAction, affected: number, failed: number): { text: string; tone: AlertTone } {
+  if (action === "publish") return { text: `${plural(affected, "palabra publicada", "palabras publicadas")}.`, tone: "success" };
+  if (action === "unpublish") return { text: `${plural(affected, "palabra devuelta", "palabras devueltas")} a borrador.`, tone: "success" };
+  if (action === "delete-images") return { text: `${plural(affected, "imagen eliminada", "imágenes eliminadas")}.`, tone: "success" };
+  if (action === "remove") return { text: `${plural(affected, "palabra quitada", "palabras quitadas")} de la colección.`, tone: "success" };
+  if (action === "refresh-images") {
+    const refreshed = `Imágenes reemplazadas en ${plural(affected, "palabra", "palabras")}`;
+    return failed ? { text: `${refreshed}; ${failed} sin resultados en Pixabay.`, tone: "info" } : { text: `${refreshed}.`, tone: "success" };
+  }
+  if (!affected && !failed) return { text: "Las palabras seleccionadas no tienen imágenes caducadas.", tone: "info" };
+  const repaired = plural(affected, "imagen reparada", "imágenes reparadas");
+  return failed ? { text: `${repaired}; ${failed} no se pudieron recuperar. Prueba «Reemplazar imágenes».`, tone: "info" } : { text: `${repaired}.`, tone: "success" };
 }
 
 type CollectionRowProps = {
@@ -44,6 +64,8 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
   const [wordsError, setWordsError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublishingWords, setIsPublishingWords] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [pendingAction, setPendingAction] = useState<WordsAction | null>(null);
 
   const fetchWords = useCallback(() => {
     setWordsError(null);
@@ -107,6 +129,38 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
 
   const publishedCount = words?.filter((word) => word.isPublished).length ?? 0;
   const visibleWords = words?.filter((word) => matchesFilter(word, wordFilter)) ?? [];
+  // Words hidden by the filter are never acted on, even if they were selected before.
+  const selectedWords = visibleWords.filter((word) => selectedIds.has(word.id));
+
+  const selectWord = (wordId: string, isSelected: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (isSelected) next.add(wordId);
+      else next.delete(wordId);
+      return next;
+    });
+  };
+
+  const applyAction = async (action: WordsAction) => {
+    if (!session || !selectedWords.length) return;
+    const wordIds = selectedWords.map((word) => word.id);
+    setPendingAction(action);
+    try {
+      const result = await runWordsAction(session, collection.id, wordIds, action);
+      if (action === "remove") {
+        if (editingWordId && wordIds.includes(editingWordId)) onEditWord(null);
+        void library.reloadCollections();
+      }
+      await loadWords(collection.id);
+      setSelectedIds(new Set());
+      const summary = actionSummary(action, result.affected, result.failed);
+      notify(summary.text, summary.tone);
+    } catch (error) {
+      notify(errorMessage(error, "No se pudo aplicar la acción a las palabras seleccionadas."), "error");
+    } finally {
+      setPendingAction(null);
+    }
+  };
   const wordCount = collection._count.words;
   const panelId = `collection-panel-${collection.id}`;
 
@@ -155,9 +209,18 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
               {words.length === 0 ? <EmptyState title="Esta colección todavía no tiene palabras" description="Añade la primera con el formulario de abajo o usa la lista rápida." /> : null}
               {words.length > 0 && visibleWords.length === 0 ? <EmptyState title="Ninguna palabra coincide con el filtro" description="Cambia el filtro para ver el resto de la colección." /> : null}
               {visibleWords.length ? (
+                <WordSelectionBar
+                  total={visibleWords.length}
+                  selected={selectedWords.length}
+                  onSelectAll={(isSelected) => setSelectedIds(new Set(isSelected ? visibleWords.map((word) => word.id) : []))}
+                  onAction={(action) => void applyAction(action)}
+                  pending={pendingAction}
+                />
+              ) : null}
+              {visibleWords.length ? (
                 <ul className="m-0 grid list-none items-start gap-1.5 p-0 xl:grid-cols-2">
                   {visibleWords.map((word) => (
-                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
+                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} isSelected={selectedIds.has(word.id)} onSelect={(isSelected) => selectWord(word.id, isSelected)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
                       {editingWordId === word.id ? (
                         <WordEditor
                           word={word}
