@@ -1,22 +1,22 @@
-type CarouselItem = { id: string; url: string };
+import { IconButton } from "./ui";
 
-type MediaCarouselProps = {
-  items: CarouselItem[];
+type CarouselControlsProps = {
   index: number;
+  count: number;
   onChange: (index: number) => void;
-  alt: string;
-  className?: string;
+  /** Noun used in the button labels, e.g. "Imagen". */
+  label: string;
 };
 
-export function MediaCarousel({ items, index, onChange, alt, className = "" }: MediaCarouselProps) {
-  if (!items.length) return <div className="image-placeholder">Imagen pendiente</div>;
-  const move = (direction: -1 | 1) => onChange((index + direction + items.length) % items.length);
-  return <div className={`media-carousel image-stage ${className}`.trim()}>
-    <img className="learning-image" src={items[index].url} alt={`${alt} ${index + 1}`} />
-    <div className="carousel-controls">
-      <button className="round-button" onClick={() => move(-1)} aria-label="Imagen anterior">←</button>
-      <span>{index + 1} / {items.length}</span>
-      <button className="round-button" onClick={() => move(1)} aria-label="Imagen siguiente">→</button>
+/** Previous/next controls that wrap around; renders nothing for a single item. */
+export function CarouselControls({ index, count, onChange, label }: CarouselControlsProps) {
+  if (count < 2) return null;
+  const move = (direction: -1 | 1) => onChange((index + direction + count) % count);
+  return (
+    <div className="flex items-center justify-center gap-4 py-2 text-xs font-bold text-muted">
+      <IconButton label={`${label} anterior`} onClick={() => move(-1)}>←</IconButton>
+      <span>{index + 1} / {count}</span>
+      <IconButton label={`${label} siguiente`} onClick={() => move(1)}>→</IconButton>
     </div>
-  </div>;
+  );
 }
