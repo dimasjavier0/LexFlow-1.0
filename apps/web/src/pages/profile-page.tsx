@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { StatusPage } from "../components/status-page";
 import { Alert, Button, buttonClasses, Eyebrow, Field, Input } from "../components/ui";
 import { useAuth } from "../contexts/auth-context";
+import { MemoryInsights } from "../features/progress/memory-insights";
+import { VocabularyJourney } from "../features/progress/vocabulary-journey";
 import { errorMessage, useAsyncAction } from "../hooks/use-async-action";
 import { AppLayout } from "../layouts/app-layout";
 import { getDashboard, updateProfile, type Dashboard } from "../lib/api";
@@ -16,6 +18,14 @@ function Stat({ label, value, hint, className }: { label: string; value: ReactNo
       {hint ? <p className="m-0 text-xs text-muted">{hint}</p> : null}
     </div>
   );
+}
+
+/** The learner's picture, or their initial when there is none or it no longer loads. */
+function Avatar({ url, name }: { url: string | null; name: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (!url || url === failedUrl) return <span aria-hidden="true" className="grid size-20 shrink-0 place-items-center rounded-3xl bg-teal-soft text-4xl font-black text-teal-dark">{name.slice(0, 1).toUpperCase()}</span>;
+  // Google only serves account pictures to requests that do not say where they come from.
+  return <img className="size-20 shrink-0 rounded-3xl bg-teal-soft object-cover" src={url} alt="" width={80} height={80} referrerPolicy="no-referrer" onError={() => setFailedUrl(url)} />;
 }
 
 function days(count: number): string {
@@ -74,11 +84,7 @@ export function ProfilePage() {
   return (
     <AppLayout>
       <header className="mt-12 mb-8 flex flex-wrap items-center gap-5">
-        {user.avatarUrl ? (
-          <img className="size-20 rounded-3xl bg-teal-soft object-cover" src={user.avatarUrl} alt="" />
-        ) : (
-          <span aria-hidden="true" className="grid size-20 place-items-center rounded-3xl bg-teal-soft text-4xl font-black text-teal-dark">{displayName.slice(0, 1).toUpperCase()}</span>
-        )}
+        <Avatar url={user.avatarUrl} name={displayName} />
         <div className="min-w-0 flex-1">
           <Eyebrow>Mi progreso</Eyebrow>
           <h1 className="mt-1 mb-0 truncate text-4xl font-bold tracking-tighter sm:text-5xl">{displayName}</h1>
@@ -121,13 +127,18 @@ export function ProfilePage() {
         </section>
       </div>
 
-      <section className="mt-8 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6" aria-labelledby="profile-heading">
+      <div className="mt-10 grid gap-10">
+        <VocabularyJourney known={words.learned + review.mastered} inProgress={words.wantToLearn - review.mastered} />
+        <MemoryInsights levels={review.levels} upcoming={review.upcoming} due={review.due} />
+      </div>
+
+      <section className="mt-10 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6" aria-labelledby="profile-heading">
         <h2 id="profile-heading" className="mb-4 text-xl font-bold tracking-tight">Tu perfil</h2>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => void submit(event)}>
           <Field label="Nombre">
             <Input maxLength={60} value={name} onChange={(event) => setName(event.target.value)} placeholder={user.email.split("@")[0]} />
           </Field>
-          <Field label="Avatar" hint="Opcional. Dirección de una imagen.">
+          <Field label="Avatar" hint="Dirección de una imagen. Si lo dejas vacío se usa la foto de tu cuenta de Google.">
             <Input type="url" maxLength={500} value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://..." />
           </Field>
           <div className="flex flex-wrap items-center gap-3 sm:col-span-2">

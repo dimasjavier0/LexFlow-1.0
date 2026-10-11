@@ -24,6 +24,13 @@
 
 	--shadow-card: 0 8px 24px rgb(23 50 77 / 4%);
 	--shadow-lift: 0 18px 50px rgb(23 50 77 / 10%);
+
+	/* A short "no" for an input that was not accepted. */
+	--animate-shake: shake .3s ease-in-out;
+	@keyframes shake {
+		25% { transform: translateX(-5px); }
+		75% { transform: translateX(5px); }
+	}
 }
 
 /* Tones: keep in sync with THEMES in lib/theme.ts. */
