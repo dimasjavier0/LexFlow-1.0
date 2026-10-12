@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AlertTone } from "../../components/ui";
-import { Alert, Button, EmptyState, Spinner, Switch } from "../../components/ui";
+import { Alert, Button, EmptyState, ProgressBar, Spinner, Switch } from "../../components/ui";
 import { errorMessage } from "../../hooks/use-async-action";
-import { removeWordFromCollection, runWordsAction, setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord, type WordsAction } from "../../lib/admin-api";
+import { removeWordFromCollection, runWordsAction, setCollectionPublication, setCollectionWordsPublication, setWordPublication, type AdminCollection, type AdminWord, type WordsAction, type WordsActionProgress } from "../../lib/admin-api";
 import { MissingMediaPreview } from "./missing-media-preview";
 import { QuickWordForm } from "./quick-word-form";
 import type { AdminLibrary } from "./use-admin-library";
@@ -68,6 +68,8 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
   const [isPublishingWords, setIsPublishingWords] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<WordsAction | null>(null);
+  // Set while an image action runs: the other actions finish in one step.
+  const [actionProgress, setActionProgress] = useState<{ label: string; step: WordsActionProgress | null } | null>(null);
 
   const fetchWords = useCallback(() => {
     setWordsError(null);
@@ -150,8 +152,10 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
     const wordIds = selectedWords.map((word) => word.id);
     const hadImages = selectedWords.some((word) => word.images.length > 0);
     setPendingAction(action);
+    if (action === "repair-images") setActionProgress({ label: "Reparando imágenes", step: null });
+    if (action === "refresh-images") setActionProgress({ label: hadImages ? "Reemplazando imágenes" : "Buscando imágenes", step: null });
     try {
-      const result = await runWordsAction(session, collection.id, wordIds, action);
+      const result = await runWordsAction(session, collection.id, wordIds, action, (step) => setActionProgress((current) => current && { ...current, step }));
       if (action === "remove") {
         if (editingWordId && wordIds.includes(editingWordId)) onEditWord(null);
         void library.reloadCollections();
@@ -164,6 +168,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
       notify(errorMessage(error, "No se pudo aplicar la acción a las palabras seleccionadas."), "error");
     } finally {
       setPendingAction(null);
+      setActionProgress(null);
     }
   };
   const wordCount = collection._count.words;
@@ -221,6 +226,22 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
                   onSelectAll={(isSelected) => selectWords(visibleWords.map((word) => word.id), isSelected)}
                   onAction={(action) => void applyAction(action)}
                   pending={pendingAction}
+                />
+              ) : null}
+              {actionProgress ? (
+                <ProgressBar
+                  label={actionProgress.label}
+                  unit={pendingAction === "repair-images" ? "imágenes" : "palabras"}
+                  done={actionProgress.step?.done ?? 0}
+                  total={actionProgress.step?.total ?? null}
+                  item={actionProgress.step?.item}
+                  details={!actionProgress.step ? [] : pendingAction === "repair-images" ? [
+                    { label: "reparadas", value: actionProgress.step.counts.repaired, tone: "good" },
+                    { label: "no recuperadas", value: actionProgress.step.counts.failed, tone: "bad" },
+                  ] : [
+                    { label: "con imágenes nuevas", value: actionProgress.step.counts.withImages, tone: "good" },
+                    { label: "sin resultados en Pixabay", value: actionProgress.step.counts.withoutImages, tone: "bad" },
+                  ]}
                 />
               ) : null}
               {visibleWords.length ? (

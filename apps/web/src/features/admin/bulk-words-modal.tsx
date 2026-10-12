@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Alert, Badge, Button, Field, Input, Modal, Select } from "../../components/ui";
+import { Alert, Badge, Button, Field, Input, Modal, ProgressBar, Select } from "../../components/ui";
 import { errorMessage, useAsyncAction } from "../../hooks/use-async-action";
-import { createWordsBulk, type BulkWordsResult } from "../../lib/admin-api";
+import { createWordsBulk, type BulkWordsProgress, type BulkWordsResult } from "../../lib/admin-api";
 import { cn } from "../../lib/cn";
 import { normalizeText, slugify } from "../../lib/slug";
 import { MAX_BULK_LISTS, MAX_BULK_WORDS, parseBulkMarkdown, type BulkLine } from "./parse-bulk-lines";
@@ -35,7 +35,8 @@ export function BulkWordsModal({ library, onClose, onListDone, onDone }: BulkWor
   const [customSlug, setCustomSlug] = useState<string | null>(null);
   const collectionSlug = customSlug ?? slugify(collectionName);
   const [text, setText] = useState("");
-  const [progress, setProgress] = useState<string | null>(null);
+  // `step` covers the list being saved; `saved` adds up the lists already finished.
+  const [progress, setProgress] = useState<{ label: string; step: BulkWordsProgress | null; saved: { withImages: number; withoutImages: number; withoutAudio: number } } | null>(null);
   const save = useAsyncAction();
 
   const { lines, lists } = useMemo(() => parseBulkMarkdown(text), [text]);
@@ -56,22 +57,27 @@ export function BulkWordsModal({ library, onClose, onListDone, onDone }: BulkWor
     const { session } = library;
     if (!session || !validCount || limitError) return;
     const results: BulkWordsResult[] = [];
+    const saved = { withImages: 0, withoutImages: 0, withoutAudio: 0 };
     const isComplete = await save.run(async () => {
       for (const [index, list] of lists.entries()) {
         const name = list.title ?? (collectionId === NEW_COLLECTION ? collectionName.trim() : collections.find((collection) => collection.id === collectionId)?.name ?? "");
-        setProgress(`Lista ${index + 1} de ${lists.length}: ${name}`);
+        const label = lists.length > 1 ? `Lista ${index + 1} de ${lists.length}: ${name}` : name;
+        setProgress({ label, step: null, saved: { ...saved } });
         // Titled lists are matched to a collection by name on the server; it creates the missing ones.
         const target = list.title === null
           ? { id: collectionId, ...(collectionId === NEW_COLLECTION ? { collectionName: name, collectionSlug } : {}) }
           : { id: NEW_COLLECTION, collectionName: list.title, collectionSlug: slugify(list.title) };
         try {
           const { id, ...newCollection } = target;
-          const result = await createWordsBulk(session, id, { words: list.words, ...newCollection });
+          const result = await createWordsBulk(session, id, { words: list.words, ...newCollection }, (step) => setProgress((current) => current && { ...current, step }));
           results.push(result);
+          saved.withImages += result.words.length - result.withoutImages;
+          saved.withoutImages += result.withoutImages;
+          saved.withoutAudio += result.failedAudio;
           onListDone(result);
         } catch (error) {
-          const saved = results.length ? ` Las ${results.length} anteriores sí se guardaron; puedes reintentar sin duplicar nada.` : "";
-          throw new Error(`“${name}”: ${errorMessage(error, "no se pudo crear la lista.")}${saved}`);
+          const earlier = results.length ? ` Las ${results.length} anteriores sí se guardaron; puedes reintentar sin duplicar nada.` : "";
+          throw new Error(`“${name}”: ${errorMessage(error, "no se pudo crear la lista.")}${earlier}`);
         }
       }
     }, "No se pudo crear la lista de palabras.");
@@ -146,7 +152,20 @@ export function BulkWordsModal({ library, onClose, onListDone, onDone }: BulkWor
         <p className={cn("m-0 text-xs font-extrabold", limitError ? "text-danger" : "text-teal-dark")}>
           {validCount} válidas · {invalidCount} inválidas{lists.length > 1 ? ` · ${lists.length} listas` : ""}{limitError ? ` · ${limitError}` : ""}
         </p>
-        {save.isPending ? <Alert tone="info">{progress ? `${progress}. ` : ""}Buscando imágenes y generando pronunciaciones.</Alert> : null}
+        {save.isPending && progress ? (
+          <ProgressBar
+            label={progress.label}
+            unit="palabras"
+            done={progress.step?.done ?? 0}
+            total={progress.step?.total ?? null}
+            item={progress.step?.item}
+            details={[
+              { label: "con imágenes", value: progress.saved.withImages + (progress.step?.counts.withImages ?? 0), tone: "good" as const },
+              { label: "sin imágenes", value: progress.saved.withoutImages + (progress.step?.counts.withoutImages ?? 0), tone: "bad" as const },
+              { label: "sin pronunciación", value: progress.saved.withoutAudio + (progress.step?.counts.withoutAudio ?? 0), tone: "bad" as const },
+            ].filter((detail) => detail.value > 0 || detail.label.includes("imágenes"))}
+          />
+        ) : null}
         {save.error ? <Alert>{save.error}</Alert> : null}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>

@@ -8,6 +8,7 @@ export { Field, Input, Select, Textarea } from "./field";
 export { FilterChips } from "./filter-chips";
 export { IconButton } from "./icon-button";
 export { Modal } from "./modal";
+export { ProgressBar, type ProgressDetail } from "./progress-bar";
 export { Spinner } from "./spinner";
 export { Switch } from "./switch";
 export { Toast, type ToastMessage } from "./toast";

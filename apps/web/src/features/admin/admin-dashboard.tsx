@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import type { AlertTone, ToastMessage } from "../../components/ui";
-import { Alert, Button, EmptyState, Eyebrow, FilterChips, Modal, Spinner, Toast } from "../../components/ui";
+import { Alert, Button, EmptyState, Eyebrow, FilterChips, Modal, ProgressBar, Spinner, Toast } from "../../components/ui";
 import { AdminLayout } from "../../layouts/admin-layout";
 import { errorMessage } from "../../hooks/use-async-action";
-import { repairImages, type AdminCollection, type BulkWordsResult } from "../../lib/admin-api";
+import { repairImages, type AdminCollection, type BulkWordsResult, type RepairProgress } from "../../lib/admin-api";
 import { BulkWordsModal } from "./bulk-words-modal";
 import { CollectionFormModal } from "./collection-form-modal";
 import { DeleteCollectionModal } from "./delete-collection-modal";
@@ -24,12 +24,14 @@ function bulkSummary(results: BulkWordsResult[]): string {
   const addedCount = total((result) => result.words.length);
   const skippedCount = total((result) => result.skipped);
   const failedAudioCount = total((result) => result.failedAudio);
+  const withoutImagesCount = total((result) => result.withoutImages);
   const createdCount = results.filter((result) => result.collectionCreated).length;
   const added = `${addedCount} ${addedCount === 1 ? "palabra añadida" : "palabras añadidas"}${results.length > 1 ? ` en ${results.length} listas` : ""}`;
   const created = createdCount ? `; ${createdCount} ${createdCount === 1 ? "colección nueva" : "colecciones nuevas"}` : "";
   const skipped = skippedCount ? `; ${skippedCount} repetidas omitidas` : "";
+  const withoutImages = withoutImagesCount ? `; ${withoutImagesCount} sin imágenes` : "";
   const failedAudio = failedAudioCount ? `; ${failedAudioCount} sin pronunciación` : "";
-  return `${added}${created}${skipped}${failedAudio}.`;
+  return `${added}${created}${skipped}${withoutImages}${failedAudio}.`;
 }
 
 export function AdminDashboard() {
@@ -41,6 +43,7 @@ export function AdminDashboard() {
   const [wordFilter, setWordFilter] = useState<WordFilter>("all");
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [repairProgress, setRepairProgress] = useState<RepairProgress | null>(null);
 
   const notify = useCallback((text: string, tone: AlertTone = "success") => setToast({ text, tone }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -50,7 +53,7 @@ export function AdminDashboard() {
     if (!session) return;
     setIsRepairing(true);
     try {
-      const result = await repairImages(session);
+      const result = await repairImages(session, setRepairProgress);
       // Covers and every word list already on screen may show repaired images.
       await Promise.all([reloadCollections(), ...Object.keys(wordsByCollection).map((collectionId) => loadWords(collectionId))]);
       if (!result.repaired && !result.failed) {
@@ -65,6 +68,7 @@ export function AdminDashboard() {
       notify(errorMessage(error, "No se pudieron reparar las imágenes."), "error");
     } finally {
       setIsRepairing(false);
+      setRepairProgress(null);
     }
   };
 
@@ -103,6 +107,18 @@ export function AdminDashboard() {
             <Button variant="secondary" size="sm" title="Descarga al servidor las imágenes de Pixabay cuyo enlace caducó" isLoading={isRepairing} loadingLabel="Reparando imágenes..." onClick={() => void repairAllImages()}>Reparar imágenes</Button>
           </div>
         </div>
+        {isRepairing ? (
+          <ProgressBar
+            label="Reparando imágenes caducadas"
+            unit="imágenes"
+            done={repairProgress?.done ?? 0}
+            total={repairProgress?.total ?? null}
+            details={repairProgress ? [
+              { label: "reparadas", value: repairProgress.counts.repaired, tone: "good" },
+              { label: "no recuperadas", value: repairProgress.counts.failed, tone: "bad" },
+            ] : []}
+          />
+        ) : null}
         <FilterChips label="Filtrar palabras" options={WORD_FILTER_OPTIONS} value={wordFilter} onChange={setWordFilter} />
         {loadError ? <Alert action={<Button variant="secondary" size="sm" onClick={() => void reloadCollections()}>Reintentar</Button>}>{loadError}</Alert> : null}
         {!collections && !loadError ? <p className="m-0 flex items-center justify-center gap-2 py-10 text-sm text-muted"><Spinner /> Cargando colecciones...</p> : null}

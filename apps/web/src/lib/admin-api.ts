@@ -1,5 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
-import { apiRequest } from "./api";
+import { apiRequest, type ApiProgress } from "./api";
 import { VIDEO_SOURCES, type VideoSourceId, type WordVideo } from "./video-sources";
 import type { ExampleSentence, PartOfSpeech, WordRelationshipType } from "./word-details";
 
@@ -65,7 +65,25 @@ export type VideoCandidate = NewWordVideo & {
   metadata: { kind: "file" | "embed"; externalId: string; thumbnailUrl: string | null; duration: number | null; title: string | null; pageUrl: string };
 };
 
-export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; collectionId: string; collectionCreated: boolean };
+export type BulkWordsResult = { words: AdminWord[]; skipped: number; received: number; failedAudio: number; withoutImages: number; collectionId: string; collectionCreated: boolean };
+
+/** Words of a list handled so far, by whether they ended up with images and with a pronunciation. */
+export type BulkWordsProgress = ApiProgress<"withImages" | "withoutImages" | "withAudio" | "withoutAudio">;
+
+/** Words checked so far, counting only the ones that lacked each kind of media. */
+export type MissingMediaProgress = ApiProgress<"imagesFound" | "imagesMissing" | "audioReady" | "audioFailed">;
+
+export type RepairProgress = ApiProgress<"repaired" | "failed">;
+
+/** Steps of an image action on selected words: images when repairing, words when replacing. */
+export type WordsActionProgress = ApiProgress<"repaired" | "failed" | "withImages" | "withoutImages">;
+
+type OnProgress<T extends ApiProgress> = (progress: T) => void;
+
+/** The API reports untyped tallies; each endpoint documents which ones it sends. */
+function typed<T extends ApiProgress>(onProgress?: OnProgress<T>): ((progress: ApiProgress) => void) | undefined {
+  return onProgress && ((progress) => onProgress(progress as T));
+}
 
 const INVALID_DATA = "Revisa los datos del formulario.";
 const IMAGE_DOWNLOAD_FAILED = "No se pudieron descargar las imágenes de Pixabay. Búscalas de nuevo e inténtalo otra vez.";
@@ -124,6 +142,7 @@ export async function createWordsBulk(
   session: Session,
   collectionId: string,
   input: { words: Array<{ term: string; translationEs: string }>; collectionName?: string; collectionSlug?: string },
+  onProgress?: OnProgress<BulkWordsProgress>,
 ): Promise<BulkWordsResult> {
   return apiRequest<BulkWordsResult>(`/admin/collections/${collectionId}/words/bulk`, {
     method: "POST",
@@ -131,16 +150,17 @@ export async function createWordsBulk(
     body: input,
     errorMessage: "No se pudo crear la lista de palabras.",
     statusMessages: { 400: "Revisa la lista y los datos de la colección." },
+    onProgress: typed(onProgress),
   });
 }
 
-export async function previewMissingMedia(session: Session, collectionId: string): Promise<MissingMediaPreview[]> {
-  const body = await apiRequest<{ previews: MissingMediaPreview[] }>(`/admin/collections/${collectionId}/images/fill-missing`, { method: "POST", session, errorMessage: "No se pudo preparar la vista previa." });
+export async function previewMissingMedia(session: Session, collectionId: string, onProgress?: OnProgress<MissingMediaProgress>): Promise<MissingMediaPreview[]> {
+  const body = await apiRequest<{ previews: MissingMediaPreview[] }>(`/admin/collections/${collectionId}/images/fill-missing`, { method: "POST", session, errorMessage: "No se pudo preparar la vista previa.", onProgress: typed(onProgress) });
   return body.previews;
 }
 
-export async function confirmMissingMedia(session: Session, collectionId: string, items: MissingMediaPreview[]): Promise<void> {
-  await apiRequest(`/admin/collections/${collectionId}/images/fill-missing/confirm`, { method: "POST", session, body: { items }, errorMessage: "No se pudo guardar el contenido propuesto." });
+export async function confirmMissingMedia(session: Session, collectionId: string, items: MissingMediaPreview[], onProgress?: OnProgress<ApiProgress<"saved">>): Promise<void> {
+  await apiRequest(`/admin/collections/${collectionId}/images/fill-missing/confirm`, { method: "POST", session, body: { items }, errorMessage: "No se pudo guardar el contenido propuesto.", onProgress: typed(onProgress) });
 }
 
 export async function searchImages(session: Session, query: string, page: number): Promise<PixabayImage[]> {
@@ -270,23 +290,25 @@ export async function setCollectionWordsPublication(session: Session, collection
 export type WordsAction = "publish" | "unpublish" | "repair-images" | "refresh-images" | "delete-images" | "remove";
 
 /** Applies one action to several words of a collection. `failed` counts what an image action could not complete. */
-export async function runWordsAction(session: Session, collectionId: string, wordIds: string[], action: WordsAction): Promise<{ affected: number; failed: number }> {
+export async function runWordsAction(session: Session, collectionId: string, wordIds: string[], action: WordsAction, onProgress?: OnProgress<WordsActionProgress>): Promise<{ affected: number; failed: number }> {
   return apiRequest(`/admin/collections/${collectionId}/words/actions`, {
     method: "POST",
     session,
     body: { wordIds, action },
     errorMessage: "No se pudo aplicar la acción a las palabras seleccionadas.",
     statusMessages: { 400: "Selecciona como máximo 200 palabras a la vez.", 503: "Pixabay no está configurado en el servidor." },
+    onProgress: typed(onProgress),
   });
 }
 
 /** Downloads every image that still points at an expired Pixabay link. `remaining` is what is left for another run. */
-export async function repairImages(session: Session): Promise<{ repaired: number; failed: number; remaining: number }> {
+export async function repairImages(session: Session, onProgress?: OnProgress<RepairProgress>): Promise<{ repaired: number; failed: number; remaining: number }> {
   return apiRequest("/admin/images/repair", {
     method: "POST",
     session,
     errorMessage: "No se pudieron reparar las imágenes.",
     statusMessages: { 503: "Pixabay no está configurado en el servidor." },
+    onProgress: typed(onProgress),
   });
 }
 
