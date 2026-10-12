@@ -9,6 +9,8 @@ type WordRowProps = {
   onToggleEdit: () => void;
   /** Whether the word is part of the selection the bulk actions apply to. */
   isSelected: boolean;
+  /** True while a bulk action runs on the selection. */
+  isSelectionDisabled: boolean;
   onSelect: (isSelected: boolean) => void;
   /** Persists the new publication state; rejections are handled by the caller. */
   onPublish: (isPublished: boolean) => Promise<void>;
@@ -18,7 +20,7 @@ type WordRowProps = {
   children?: ReactNode;
 };
 
-export function WordRow({ word, isEditing, onToggleEdit, isSelected, onSelect, onPublish, onRemove, children }: WordRowProps) {
+export function WordRow({ word, isEditing, onToggleEdit, isSelected, isSelectionDisabled, onSelect, onPublish, onRemove, children }: WordRowProps) {
   const [cover, ...otherImages] = word.images;
   const [isPublishing, setIsPublishing] = useState(false);
   const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
@@ -41,7 +43,7 @@ export function WordRow({ word, isEditing, onToggleEdit, isSelected, onSelect, o
   return (
     <li className={cn("overflow-hidden rounded-xl border bg-surface", isEditing ? "border-teal xl:col-span-2" : isSelected ? "border-teal" : "border-line")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-2">
-        <input type="checkbox" className="ml-1 size-4 shrink-0 cursor-pointer accent-teal-dark" aria-label={`Seleccionar ${word.term}`} checked={isSelected} onChange={(event) => onSelect(event.target.checked)} />
+        <input type="checkbox" className="ml-1 size-4 shrink-0 cursor-pointer accent-teal-dark" aria-label={`Seleccionar ${word.term}`} checked={isSelected} disabled={isSelectionDisabled} onChange={(event) => onSelect(event.target.checked)} />
         <button type="button" aria-expanded={isEditing} onClick={onToggleEdit} className="flex min-w-0 flex-1 basis-40 cursor-pointer items-center gap-3 rounded-lg p-1 text-left hover:bg-teal-soft/50">
           {cover ? (
             <img className="size-11 shrink-0 rounded-lg bg-teal-soft object-cover" src={cover.url} alt="" />

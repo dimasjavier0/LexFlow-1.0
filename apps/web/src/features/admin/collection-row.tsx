@@ -31,13 +31,13 @@ function plural(count: number, one: string, many: string): string {
 }
 
 /** What to tell the admin once a bulk action has finished. */
-function actionSummary(action: WordsAction, affected: number, failed: number): { text: string; tone: AlertTone } {
+function actionSummary(action: WordsAction, affected: number, failed: number, hadImages: boolean): { text: string; tone: AlertTone } {
   if (action === "publish") return { text: `${plural(affected, "palabra publicada", "palabras publicadas")}.`, tone: "success" };
   if (action === "unpublish") return { text: `${plural(affected, "palabra devuelta", "palabras devueltas")} a borrador.`, tone: "success" };
   if (action === "delete-images") return { text: `${plural(affected, "imagen eliminada", "imágenes eliminadas")}.`, tone: "success" };
   if (action === "remove") return { text: `${plural(affected, "palabra quitada", "palabras quitadas")} de la colección.`, tone: "success" };
   if (action === "refresh-images") {
-    const refreshed = `Imágenes reemplazadas en ${plural(affected, "palabra", "palabras")}`;
+    const refreshed = `Imágenes ${hadImages ? "reemplazadas en" : "añadidas a"} ${plural(affected, "palabra", "palabras")}`;
     return failed ? { text: `${refreshed}; ${failed} sin resultados en Pixabay.`, tone: "info" } : { text: `${refreshed}.`, tone: "success" };
   }
   if (!affected && !failed) return { text: "Las palabras seleccionadas no tienen imágenes caducadas.", tone: "info" };
@@ -129,14 +129,16 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
 
   const publishedCount = words?.filter((word) => word.isPublished).length ?? 0;
   const visibleWords = words?.filter((word) => matchesFilter(word, wordFilter)) ?? [];
-  // Words hidden by the filter are never acted on, even if they were selected before.
+  // Words hidden by the filter keep their checkbox for when they are listed again, but are never acted on.
   const selectedWords = visibleWords.filter((word) => selectedIds.has(word.id));
 
-  const selectWord = (wordId: string, isSelected: boolean) => {
+  const selectWords = (wordIds: string[], isSelected: boolean) => {
     setSelectedIds((current) => {
       const next = new Set(current);
-      if (isSelected) next.add(wordId);
-      else next.delete(wordId);
+      for (const wordId of wordIds) {
+        if (isSelected) next.add(wordId);
+        else next.delete(wordId);
+      }
       return next;
     });
   };
@@ -144,6 +146,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
   const applyAction = async (action: WordsAction) => {
     if (!session || !selectedWords.length) return;
     const wordIds = selectedWords.map((word) => word.id);
+    const hadImages = selectedWords.some((word) => word.images.length > 0);
     setPendingAction(action);
     try {
       const result = await runWordsAction(session, collection.id, wordIds, action);
@@ -152,8 +155,8 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
         void library.reloadCollections();
       }
       await loadWords(collection.id);
-      setSelectedIds(new Set());
-      const summary = actionSummary(action, result.affected, result.failed);
+      selectWords(wordIds, false);
+      const summary = actionSummary(action, result.affected, result.failed, hadImages);
       notify(summary.text, summary.tone);
     } catch (error) {
       notify(errorMessage(error, "No se pudo aplicar la acción a las palabras seleccionadas."), "error");
@@ -211,8 +214,8 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
               {visibleWords.length ? (
                 <WordSelectionBar
                   total={visibleWords.length}
-                  selected={selectedWords.length}
-                  onSelectAll={(isSelected) => setSelectedIds(new Set(isSelected ? visibleWords.map((word) => word.id) : []))}
+                  selectedWords={selectedWords}
+                  onSelectAll={(isSelected) => selectWords(visibleWords.map((word) => word.id), isSelected)}
                   onAction={(action) => void applyAction(action)}
                   pending={pendingAction}
                 />
@@ -220,7 +223,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
               {visibleWords.length ? (
                 <ul className="m-0 grid list-none items-start gap-1.5 p-0 xl:grid-cols-2">
                   {visibleWords.map((word) => (
-                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} isSelected={selectedIds.has(word.id)} onSelect={(isSelected) => selectWord(word.id, isSelected)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
+                    <WordRow key={word.id} word={word} isEditing={editingWordId === word.id} onToggleEdit={() => onEditWord(editingWordId === word.id ? null : word.id)} isSelected={selectedIds.has(word.id)} isSelectionDisabled={pendingAction !== null} onSelect={(isSelected) => selectWords([word.id], isSelected)} onPublish={(isPublished) => publishWord(word, isPublished)} onRemove={() => removeWord(word)}>
                       {editingWordId === word.id ? (
                         <WordEditor
                           word={word}
