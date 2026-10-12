@@ -6,11 +6,12 @@ import { errorMessage } from "../../hooks/use-async-action";
 import { repairImages, type AdminCollection, type BulkWordsResult } from "../../lib/admin-api";
 import { BulkWordsModal } from "./bulk-words-modal";
 import { CollectionFormModal } from "./collection-form-modal";
-import { CollectionRow, WORD_FILTER_OPTIONS, type WordFilter } from "./collection-row";
+import { DeleteCollectionModal } from "./delete-collection-modal";
+import { CollectionRow,WORD_FILTER_OPTIONS, type WordFilter } from "./collection-row";
 import { useAdminLibrary } from "./use-admin-library";
 import { WordEditor } from "./word-editor";
 
-type ModalState = { type: "collection"; collection?: AdminCollection } | { type: "bulk" } | { type: "word" } | null;
+type ModalState = { type: "collection"; collection?: AdminCollection } | { type: "delete-collection"; collection: AdminCollection } | { type: "bulk" } | { type: "word" } | null;
 
 const QUICK_ACTIONS: Array<{ modal: NonNullable<ModalState>; icon: string; title: string; description: string }> = [
   { modal: { type: "word" }, icon: "＋", title: "Nueva palabra", description: "Crea una palabra con sus imágenes y video." },
@@ -118,6 +119,7 @@ export function AdminDashboard() {
                 isExpanded={expanded[collection.id] ?? false}
                 onToggle={() => setExpanded((current) => ({ ...current, [collection.id]: !current[collection.id] }))}
                 onEdit={() => setModal({ type: "collection", collection })}
+                onDelete={() => setModal({ type: "delete-collection", collection })}
                 wordFilter={wordFilter}
                 editingWordId={editingWordId}
                 onEditWord={setEditingWordId}
@@ -134,6 +136,17 @@ export function AdminDashboard() {
           library={library}
           onClose={closeModal}
           onSaved={(message) => {
+            closeModal();
+            notify(message);
+          }}
+        />
+      ) : null}
+      {modal?.type === "delete-collection" ? (
+        <DeleteCollectionModal
+          collection={modal.collection}
+          library={library}
+          onClose={closeModal}
+          onDeleted={(message) => {
             closeModal();
             notify(message);
           }}
