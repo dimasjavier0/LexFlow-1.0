@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { AlertTone } from "../../components/ui";
-import { Button } from "../../components/ui";
+import { Button, ProgressBar } from "../../components/ui";
 import { errorMessage } from "../../hooks/use-async-action";
-import { confirmMissingMedia, previewMissingMedia, type MissingMediaPreview as Preview } from "../../lib/admin-api";
+import type { ApiProgress } from "../../lib/api";
+import { confirmMissingMedia, previewMissingMedia, type MissingMediaPreview as Preview, type MissingMediaProgress } from "../../lib/admin-api";
 import type { AdminLibrary } from "./use-admin-library";
 
 type MissingMediaPreviewProps = {
@@ -15,13 +16,15 @@ type MissingMediaPreviewProps = {
 export function MissingMediaPreview({ collectionId, library, notify }: MissingMediaPreviewProps) {
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [pending, setPending] = useState<"preview" | "confirm" | null>(null);
+  const [searchProgress, setSearchProgress] = useState<MissingMediaProgress | null>(null);
+  const [saveProgress, setSaveProgress] = useState<ApiProgress<"saved"> | null>(null);
 
   const prepare = async () => {
     const { session } = library;
     if (!session) return;
     setPending("preview");
     try {
-      const result = await previewMissingMedia(session, collectionId);
+      const result = await previewMissingMedia(session, collectionId, setSearchProgress);
       setPreviews(result);
       if (result.length) notify(`${result.length} ${result.length === 1 ? "palabra lista" : "palabras listas"} para revisar.`, "info");
       else notify("Todas las palabras ya tienen imágenes y sonido.");
@@ -29,6 +32,7 @@ export function MissingMediaPreview({ collectionId, library, notify }: MissingMe
       notify(errorMessage(error, "No se pudo preparar la vista previa."), "error");
     } finally {
       setPending(null);
+      setSearchProgress(null);
     }
   };
 
@@ -37,7 +41,7 @@ export function MissingMediaPreview({ collectionId, library, notify }: MissingMe
     if (!session) return;
     setPending("confirm");
     try {
-      await confirmMissingMedia(session, collectionId, previews);
+      await confirmMissingMedia(session, collectionId, previews, setSaveProgress);
       setPreviews([]);
       await library.loadWords(collectionId);
       notify("Imágenes y pronunciaciones guardadas.");
@@ -45,6 +49,7 @@ export function MissingMediaPreview({ collectionId, library, notify }: MissingMe
       notify(errorMessage(error, "No se pudo guardar el contenido propuesto."), "error");
     } finally {
       setPending(null);
+      setSaveProgress(null);
     }
   };
 
@@ -57,6 +62,30 @@ export function MissingMediaPreview({ collectionId, library, notify }: MissingMe
         </Button>
         {previews.length ? <Button size="sm" disabled={pending !== null} isLoading={pending === "confirm"} loadingLabel="Guardando..." onClick={() => void confirm()}>Confirmar y guardar</Button> : null}
       </div>
+      {pending === "preview" ? (
+        <ProgressBar
+          label="Buscando imágenes y pronunciación"
+          unit="palabras"
+          done={searchProgress?.done ?? 0}
+          total={searchProgress?.total ?? null}
+          item={searchProgress?.item}
+          details={searchProgress ? [
+            { label: "con imágenes propuestas", value: searchProgress.counts.imagesFound, tone: "good" as const },
+            { label: "sin imágenes en Pixabay", value: searchProgress.counts.imagesMissing, tone: "bad" as const },
+            { label: "con pronunciación nueva", value: searchProgress.counts.audioReady, tone: "good" as const },
+            { label: "sin pronunciación", value: searchProgress.counts.audioFailed, tone: "bad" as const },
+          ].filter((detail) => detail.value > 0 || detail.label.includes("imágenes")) : []}
+        />
+      ) : null}
+      {pending === "confirm" ? (
+        <ProgressBar
+          label="Guardando imágenes y pronunciaciones"
+          unit="palabras"
+          done={saveProgress?.done ?? 0}
+          total={saveProgress?.total ?? null}
+          details={saveProgress ? [{ label: "guardadas", value: saveProgress.counts.saved, tone: "good" }] : []}
+        />
+      ) : null}
       {previews.length ? (
         <div className="grid gap-2.5 rounded-xl border border-sun bg-sun-soft p-3.5">
           <strong className="text-xs text-warning">Vista previa, todavía no guardada</strong>

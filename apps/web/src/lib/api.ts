@@ -88,12 +88,56 @@ type RequestOptions = {
   statusMessages?: Record<number, string>;
   /** Show the API's own `message` (only for endpoints that answer in Spanish). */
   preferServerMessage?: boolean;
+  /** Called after each item of a long request. Only the endpoints that work through several items report steps. */
+  onProgress?: (progress: ApiProgress) => void;
 };
+
+/** One step of a long request: how far it is and its tallies so far. */
+export type ApiProgress<Count extends string = string> = {
+  done: number;
+  total: number;
+  /** Name of the item that just finished. */
+  item?: string;
+  counts: Record<Count, number>;
+};
+
+const PROGRESS_CONTENT_TYPE = "application/x-ndjson";
+
+/** Reads a progress stream: one JSON line per step, with the response body in the last one. */
+async function readProgressStream<T>(stream: ReadableStream<Uint8Array>, onProgress: (progress: ApiProgress) => void, errorMessage: string): Promise<T> {
+  const outcome: { body?: T } = {};
+  const readLine = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as { type: "progress" } & ApiProgress | { type: "result"; body: T } | { type: "error" };
+    if (event.type === "progress") onProgress({ done: event.done, total: event.total, item: event.item, counts: event.counts });
+    else if (event.type === "result") outcome.body = event.body;
+  };
+
+  try {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let pending = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const lines = (pending + decoder.decode(value, { stream: true })).split("\n");
+      pending = lines.pop() ?? "";
+      lines.forEach(readLine);
+    }
+    readLine(pending);
+  } catch {
+    throw new ApiError("Se perdió la conexión con el servidor antes de terminar. Recarga para ver qué se guardó.", 0);
+  }
+  // The server closes the stream without a result when it fails halfway.
+  if (!("body" in outcome)) throw new ApiError(errorMessage, 500);
+  return outcome.body as T;
+}
 
 /** Single entry point for API calls: auth header, JSON encoding and error mapping. */
 export async function apiRequest<T = void>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", session, body, errorMessage = "No se pudo completar la operación.", statusMessages, preferServerMessage = false } = options;
+  const { method = "GET", session, body, errorMessage = "No se pudo completar la operación.", statusMessages, preferServerMessage = false, onProgress } = options;
   const headers: Record<string, string> = {};
+  if (onProgress) headers.Accept = `${PROGRESS_CONTENT_TYPE}, application/json`;
   if (session) headers.Authorization = `Bearer ${session.access_token}`;
   const isFormData = body instanceof FormData;
   if (body !== undefined && !isFormData) headers["Content-Type"] = "application/json";
@@ -107,6 +151,10 @@ export async function apiRequest<T = void>(path: string, options: RequestOptions
     });
   } catch {
     throw new ApiError("No se pudo conectar con el servidor.", 0);
+  }
+
+  if (onProgress && response.ok && response.body && response.headers.get("content-type")?.startsWith(PROGRESS_CONTENT_TYPE)) {
+    return readProgressStream<T>(response.body, onProgress, errorMessage);
   }
 
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null);
