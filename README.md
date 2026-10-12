@@ -138,7 +138,7 @@ En la API, esos endpoints aceptan `Accept: application/x-ndjson`. Con esa cabece
 LexFlow puede generar pronunciaciones gratuitas con Piper TTS. Piper y las voces descargadas localmente quedan en el entorno Python y en `apps/api/models/piper/`. Configura en el `.env` de la raíz:
 
 ```env
-PIPER_PATH="C:/Users/DJRODRIGUEZC/.pyenv/pyenv-win/versions/3.12.4/Scripts/piper.exe"
+PIPER_PATH="C:/Users/NAMEUSER/.pyenv/pyenv-win/versions/3.12.4/Scripts/piper.exe"
 PIPER_VOICE_MODEL_US="apps/api/models/piper/en_US-amy-medium.onnx"
 PIPER_VOICE_MODEL_UK="apps/api/models/piper/en_GB-alan-medium.onnx"
 ```
