@@ -51,13 +51,15 @@ type CollectionRowProps = {
   isExpanded: boolean;
   onToggle: () => void;
   onEdit: () => void;
+  /** Opens the confirmation; the row never deletes on its own. */
+  onDelete: () => void;
   wordFilter: WordFilter;
   editingWordId: string | null;
   onEditWord: (wordId: string | null) => void;
   notify: (text: string, tone?: AlertTone) => void;
 };
 
-export function CollectionRow({ collection, library, isExpanded, onToggle, onEdit, wordFilter, editingWordId, onEditWord, notify }: CollectionRowProps) {
+export function CollectionRow({ collection, library, isExpanded, onToggle, onEdit, onDelete, wordFilter, editingWordId, onEditWord, notify }: CollectionRowProps) {
   const { loadWords, patchCollection, session } = library;
   const words = library.wordsByCollection[collection.id];
   const isLoaded = words !== undefined;
@@ -184,6 +186,7 @@ export function CollectionRow({ collection, library, isExpanded, onToggle, onEdi
         </button>
         <div className="ml-auto flex items-center gap-2 pr-1">
           <Button variant="secondary" size="sm" onClick={onEdit}>Editar</Button>
+          <Button variant="ghost" size="sm" className="text-danger! hover:bg-danger-soft!" aria-label={`Eliminar ${collection.name}`} onClick={onDelete}>Eliminar</Button>
           <Switch
             checked={collection.isPublished}
             disabled={isPublishing}
